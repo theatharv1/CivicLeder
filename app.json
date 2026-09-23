@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "CivicLeder",
+    "slug": "civicleader",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "civicleader",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.civicleader.app"
+    },
+    "android": {
+      "package": "com.civicleader.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CivicLeder needs photos only to attach to your personal draft notes.",
+          "cameraPermission": "CivicLeder needs the camera only to attach photos to your draft.",
+          "microphonePermission": "CivicLeder needs the microphone only if you record a short video for your draft."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CivicLeder uses your location to suggest where the problem is, for your draft only."
+        }
+      ]
+    ]
+  }
+}
