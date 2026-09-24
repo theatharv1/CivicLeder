@@ -79,8 +79,8 @@ export default function ContributeTipScreen({ navigation, route }: Props) {
       return;
     }
     Alert.alert(
-      "Thanks - neighbours will check this",
-      "Not official government information. Call / Open Official still use verified contacts only.",
+      "Thanks - posted anonymously",
+      "Neighbours can check this. Your name is not shown. Not official government information.",
       [{ text: "OK", onPress: () => navigation.goBack() }]
     );
   };
@@ -103,8 +103,9 @@ export default function ContributeTipScreen({ navigation, route }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.lead}>
-          One short tip neighbours can check. Not a government warning. Official
-          Call buttons stay on verified contacts.
+          One short tip neighbours can check. Posted anonymously - your name or
+          username is never shown. Not a government warning. Official Call
+          buttons stay on verified contacts.
         </Text>
 
         <Text style={styles.label}>About</Text>

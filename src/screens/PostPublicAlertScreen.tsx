@@ -129,8 +129,9 @@ export default function PostPublicAlertScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.lead}>
-          Seen a crack, pothole or danger? Post a photo and place. No name - 
-          anonymous. Neighbours can tap “I see this too”.
+          Seen a crack, pothole or danger? Post a photo and place. Always
+          anonymous - even if you have a profile, your username is never shown.
+          Neighbours can tap “I see this too”.
         </Text>
 
         <Text style={styles.label}>Photo</Text>

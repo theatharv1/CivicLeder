@@ -11,6 +11,7 @@ import MainTabsScreen from "./src/navigation/MainTabsScreen";
 import type { RootStackParamList } from "./src/navigation/types";
 import AboutScreen from "./src/screens/AboutScreen";
 import AllIssuesScreen from "./src/screens/AllIssuesScreen";
+import AuthScreen from "./src/screens/AuthScreen";
 import CaseDetailsScreen from "./src/screens/CaseDetailsScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
 import HelpSupportScreen from "./src/screens/HelpSupportScreen";
@@ -83,6 +84,7 @@ export default function App() {
                     name="EditProfile"
                     component={EditProfileScreen}
                   />
+                  <Stack.Screen name="Auth" component={AuthScreen} />
                   <Stack.Screen
                     name="Notifications"
                     component={NotificationsScreen}

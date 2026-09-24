@@ -1,7 +1,6 @@
 import React from "react";
 import {
   Alert,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +19,7 @@ import {
   Languages,
   LogOut,
   Settings,
+  User,
 } from "lucide-react-native";
 import { useI18n } from "../Context/I18nContext";
 import { useProfile } from "../Context/ProfileContext";
@@ -27,25 +27,22 @@ import { APP_NAME } from "../lib/brand";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, radii, space } from "../theme/tokens";
 
-const AVATAR = require("../../assets/images/avatar.png");
-
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
   const { t, lang } = useI18n();
-  const { profile, logOut, loggedIn, logIn } = useProfile();
+  const { profile, loggedIn, logOut, isGuest } = useProfile();
 
   const onLogout = () => {
-    Alert.alert(`Log out of ${APP_NAME}?`, undefined, [
+    Alert.alert(`Switch to guest?`, `You will stay signed out of ${APP_NAME} until you sign in again. Your account stays on this phone.`, [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Log Out",
+        text: "Use as guest",
         style: "destructive",
         onPress: () => {
-          logOut();
-          Alert.alert("Logged out", "You can continue browsing as a guest.");
+          void logOut();
         },
       },
     ]);
@@ -101,7 +98,11 @@ export default function ProfileScreen() {
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{t.profile}</Text>
-            <Text style={styles.sub}>{t.profileSub}</Text>
+            <Text style={styles.sub}>
+              {isGuest
+                ? "Continue as a guest, or create a profile when you want."
+                : t.profileSub}
+            </Text>
           </View>
           <Pressable
             style={styles.settingsBtn}
@@ -111,18 +112,58 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        <Pressable
-          style={({ pressed }) => [styles.userCard, pressed && { opacity: 0.92 }]}
-          onPress={() => navigation.navigate("EditProfile")}
-        >
-          <Image source={AVATAR} style={styles.avatar} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{profile.name}</Text>
-            <Text style={styles.email}>{profile.email}</Text>
-            <Text style={styles.loc}>{profile.location}</Text>
+        {loggedIn && profile ? (
+          <Pressable
+            style={({ pressed }) => [styles.userCard, pressed && { opacity: 0.92 }]}
+            onPress={() => navigation.navigate("EditProfile")}
+          >
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarLetter}>
+                {profile.displayName.slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{profile.displayName}</Text>
+              <Text style={styles.email}>@{profile.username}</Text>
+              <Text style={styles.loc}>Public posts stay anonymous</Text>
+            </View>
+            <ChevronRight size={20} color={colors.muted} />
+          </Pressable>
+        ) : (
+          <View style={styles.userCard}>
+            <View style={styles.avatarFallback}>
+              <User size={22} color={colors.primaryBlue} strokeWidth={2.2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>Guest</Text>
+              <Text style={styles.email}>
+                No account yet. You can use the app fully as a guest.
+              </Text>
+              <Text style={styles.loc}>Public posts are always anonymous</Text>
+            </View>
           </View>
-          <ChevronRight size={20} color={colors.muted} />
-        </Pressable>
+        )}
+
+        {isGuest ? (
+          <View style={styles.guestActions}>
+            <Pressable
+              style={styles.primaryBtn}
+              onPress={() => navigation.navigate("Auth", { mode: "create" })}
+            >
+              <Text style={styles.primaryBtnText}>Create profile</Text>
+            </Pressable>
+            <Pressable
+              style={styles.secondaryBtn}
+              onPress={() => navigation.navigate("Auth", { mode: "signin" })}
+            >
+              <Text style={styles.secondaryBtnText}>Sign in</Text>
+            </Pressable>
+            <Text style={styles.guestHint}>
+              Username and password stay on this phone. Posting publicly never
+              shows your name.
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.menu}>
           {rows.map((row, index) => (
@@ -153,13 +194,9 @@ export default function ProfileScreen() {
             onPress={onLogout}
           >
             <LogOut size={18} color={colors.logoutFg} strokeWidth={2.2} />
-            <Text style={styles.logoutText}>{t.logout}</Text>
+            <Text style={styles.logoutText}>Use as guest</Text>
           </Pressable>
-        ) : (
-          <Pressable style={styles.login} onPress={logIn}>
-            <Text style={styles.loginText}>Log In</Text>
-          </Pressable>
-        )}
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -203,11 +240,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-  avatar: {
+  avatarFallback: {
     width: 56,
     height: 56,
     borderRadius: 28,
     backgroundColor: colors.lightBlue,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarLetter: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.navy,
   },
   name: {
     fontSize: 16,
@@ -224,6 +268,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.muted,
     fontWeight: "500",
+  },
+  guestActions: {
+    marginTop: 14,
+    gap: 10,
+  },
+  primaryBtn: {
+    backgroundColor: colors.primaryBlue,
+    borderRadius: radii.lg,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  primaryBtnText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  secondaryBtn: {
+    borderRadius: radii.lg,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  secondaryBtnText: {
+    color: colors.navy,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  guestHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.muted,
+    textAlign: "center",
   },
   menu: {
     marginTop: 18,
@@ -274,18 +352,6 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     color: colors.logoutFg,
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  login: {
-    marginTop: 22,
-    backgroundColor: colors.primaryBlue,
-    borderRadius: radii.lg,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  loginText: {
-    color: colors.white,
     fontSize: 16,
     fontWeight: "800",
   },

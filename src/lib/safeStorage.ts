@@ -55,3 +55,17 @@ export async function storageRemoveItem(key: string): Promise<void> {
   }
   memory.delete(key);
 }
+
+export async function storageMultiRemove(keys: string[]): Promise<void> {
+  if (keys.length === 0) return;
+  if (await probeNative()) {
+    try {
+      await AsyncStorage.multiRemove(keys);
+      for (const key of keys) memory.delete(key);
+      return;
+    } catch {
+      nativeOk = false;
+    }
+  }
+  for (const key of keys) memory.delete(key);
+}

@@ -15,6 +15,7 @@ export type RootStackParamList = {
   AllIssues: undefined;
   Settings: undefined;
   EditProfile: undefined;
+  Auth: { mode?: "create" | "signin" } | undefined;
   Notifications: undefined;
   Language: undefined;
   HelpSupport: undefined;

@@ -1,11 +1,22 @@
-import React from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ArrowLeft } from "lucide-react-native";
+import { useProfile } from "../Context/ProfileContext";
 import { APP_NAME } from "../lib/brand";
+import { deleteAllLocalUserData } from "../lib/userData";
 import type { RootStackParamList } from "../navigation/types";
-import { colors, space } from "../theme/tokens";
+import { colors, radii, space } from "../theme/tokens";
 
 const LOGO = require("../../assets/images/civicleader-logo.png");
 
@@ -13,6 +24,43 @@ type Props = NativeStackScreenProps<RootStackParamList, "About">;
 
 export default function AboutScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { resetToGuest } = useProfile();
+  const [deleting, setDeleting] = useState(false);
+
+  const onDeleteData = () => {
+    Alert.alert(
+      "Delete my data on this phone?",
+      "This removes your local alerts, tips, case notes, votes, device id, and any username profile saved here. It does not change anything at government offices. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete everything",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              setDeleting(true);
+              try {
+                await deleteAllLocalUserData();
+                resetToGuest();
+                Alert.alert(
+                  "Data deleted",
+                  "This phone is clear. You are back as a guest."
+                );
+              } catch {
+                Alert.alert(
+                  "Could not delete",
+                  "Try again. If it keeps failing, reinstall the app."
+                );
+              } finally {
+                setDeleting(false);
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.root}>
       <ScrollView
@@ -67,15 +115,33 @@ export default function AboutScreen({ navigation }: Props) {
           Neighbours can share short tips and optional .gov.in links. Others
           can mark “Seen this too” or “Not accurate”. Tips are never treated as
           government law. Call and Open buttons always use verified contacts.
-          You cannot validate your own tip.
+          You cannot validate your own tip. Tips are anonymous.
         </Text>
 
         <Text style={styles.section}>Public alerts</Text>
         <Text style={styles.body}>
           Anyone can post an anonymous photo of a danger they see (crack,
           pothole, open drain). Others can tap “I see this too”. No names are
-          shown.
+          shown - even if you have a profile.
         </Text>
+
+        <Text style={styles.section}>Your data on this phone</Text>
+        <Text style={styles.body}>
+          Alerts, tips, case notes, and an optional username profile stay on
+          this device. You can delete all of that anytime.
+        </Text>
+
+        <Pressable
+          style={[styles.deleteBtn, deleting && { opacity: 0.7 }]}
+          disabled={deleting}
+          onPress={onDeleteData}
+        >
+          {deleting ? (
+            <ActivityIndicator color={colors.logoutFg} />
+          ) : (
+            <Text style={styles.deleteText}>Delete my data</Text>
+          )}
+        </Pressable>
 
         <Text style={styles.meta}>Version 1.0.0</Text>
         <Text style={styles.meta}>
@@ -121,6 +187,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: colors.mutedDark,
+  },
+  deleteBtn: {
+    marginTop: 16,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.logoutFg,
+    backgroundColor: colors.logoutBg,
+    paddingVertical: 14,
+    alignItems: "center",
+    minHeight: 48,
+    justifyContent: "center",
+  },
+  deleteText: {
+    color: colors.logoutFg,
+    fontSize: 15,
+    fontWeight: "800",
   },
   meta: {
     marginTop: 16,

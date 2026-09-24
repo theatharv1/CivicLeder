@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,10 +19,29 @@ type Props = NativeStackScreenProps<RootStackParamList, "EditProfile">;
 
 export default function EditProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { profile, setProfile } = useProfile();
-  const [name, setName] = useState(profile.name);
-  const [email, setEmail] = useState(profile.email);
-  const [location, setLocation] = useState(profile.location);
+  const { profile, loggedIn, setDisplayName } = useProfile();
+  const [displayName, setName] = useState(profile?.displayName ?? "");
+
+  if (!loggedIn || !profile) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top + 8, paddingHorizontal: space.screen }]}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.back}>
+          <ArrowLeft size={22} color={colors.navy} />
+        </Pressable>
+        <Text style={styles.title}>No profile yet</Text>
+        <Text style={styles.hint}>
+          You are browsing as a guest. Create a username and password if you want
+          a profile on this phone.
+        </Text>
+        <Pressable
+          style={styles.save}
+          onPress={() => navigation.replace("Auth", { mode: "create" })}
+        >
+          <Text style={styles.saveText}>Create profile</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -36,28 +56,31 @@ export default function EditProfileScreen({ navigation }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.back}>
           <ArrowLeft size={22} color={colors.navy} />
         </Pressable>
-        <Text style={styles.title}>Edit Profile</Text>
-        <Text style={styles.label}>Name</Text>
-        <TextInput style={styles.input} value={name} onChangeText={setName} />
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.title}>Edit profile</Text>
+        <Text style={styles.hint}>
+          This stays on your phone. Public posts never show your username.
+        </Text>
+
+        <Text style={styles.label}>Username</Text>
+        <Text style={styles.readonly}>@{profile.username}</Text>
+
+        <Text style={styles.label}>Display name</Text>
         <TextInput
           style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
+          value={displayName}
+          onChangeText={setName}
+          placeholder="Only visible to you"
+          placeholderTextColor={colors.muted}
         />
-        <Text style={styles.label}>Location</Text>
-        <TextInput
-          style={styles.input}
-          value={location}
-          onChangeText={setLocation}
-        />
+
         <Pressable
           style={styles.save}
           onPress={() => {
-            setProfile({ name, email, location });
-            navigation.goBack();
+            void (async () => {
+              await setDisplayName(displayName);
+              Alert.alert("Saved", "Profile updated on this phone.");
+              navigation.goBack();
+            })();
           }}
         >
           <Text style={styles.saveText}>Save</Text>
@@ -82,13 +105,25 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     color: colors.navy,
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  hint: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.mutedDark,
+    marginBottom: 8,
   },
   label: {
     marginTop: 12,
     fontSize: 13,
     fontWeight: "700",
     color: colors.mutedDark,
+  },
+  readonly: {
+    marginTop: 6,
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.navy,
   },
   input: {
     marginTop: 6,
