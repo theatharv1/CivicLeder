@@ -33,7 +33,7 @@ import {
   type LocationSource,
 } from "../../Context/ReportDraftContext";
 import { reportPhase } from "../../lib/reportPhase";
-import { supabase, supabaseConfigured } from "../../lib/supabase";
+import { api, apiConfigured } from "../../lib/apiClient";
 import type { RootStackParamList } from "../../navigation/types";
 import { colors, radii, space } from "../../theme/tokens";
 
@@ -213,54 +213,39 @@ export default function ReportStep5Screen({ navigation }: Props) {
   };
 
   const persistLocation = async () => {
-    if (!supabaseConfigured || !supabase) return;
-    const now = new Date().toISOString();
+    if (!apiConfigured) return;
+
     const rows: Record<string, unknown>[] = [];
 
     if (locationDraft.currentLocation) {
       rows.push({
-        draft_key: draftKey,
-        location_kind: "current",
-        location_source: "current_gps",
+        draftKey,
         latitude: locationDraft.currentLocation.latitude,
         longitude: locationDraft.currentLocation.longitude,
-        address_text: locationDraft.currentLocation.addressText,
-        accuracy_meters: locationDraft.currentLocation.accuracyMeters,
-        location_captured_at: locationDraft.currentLocation.capturedAt,
-        jurisdiction_status: "unknown",
-        add_location_on_photo: locationDraft.addLocationOnPhoto,
+        addressText: locationDraft.currentLocation.addressText,
+        accuracyMeters: locationDraft.currentLocation.accuracyMeters,
+        jurisdictionStatus: "unknown",
+        addLocationOnPhoto: locationDraft.addLocationOnPhoto,
         source: "user",
-        updated_at: now,
       });
     }
 
     if (hasIncidentLocation(locationDraft)) {
       rows.push({
-        draft_key: draftKey,
-        location_kind: "incident",
-        location_source: locationDraft.locationSource,
+        draftKey,
         latitude: locationDraft.latitude,
         longitude: locationDraft.longitude,
-        address_text: locationDraft.addressText,
+        addressText: locationDraft.addressText,
         landmark: locationDraft.landmark || null,
-        building: locationDraft.building || null,
-        street: locationDraft.street || null,
-        locality: locationDraft.locality || null,
-        city: locationDraft.city || null,
-        state: locationDraft.state || null,
-        postal: locationDraft.postal || null,
-        country: locationDraft.country || null,
-        accuracy_meters: locationDraft.accuracyMeters,
-        location_captured_at: locationDraft.locationCapturedAt ?? now,
-        jurisdiction_status: locationDraft.jurisdictionStatus,
-        add_location_on_photo: locationDraft.addLocationOnPhoto,
+        accuracyMeters: locationDraft.accuracyMeters,
+        jurisdictionStatus: locationDraft.jurisdictionStatus,
+        addLocationOnPhoto: locationDraft.addLocationOnPhoto,
         source: "user",
-        updated_at: now,
       });
     }
 
     for (const row of rows) {
-      await supabase.from("report_locations").insert(row);
+      await api.createReportLocation(row);
     }
   };
 

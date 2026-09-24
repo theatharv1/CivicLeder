@@ -1,5 +1,5 @@
+import { api, apiConfigured } from "./apiClient";
 import { storageGetItem, storageSetItem } from "./safeStorage";
-import { supabase, supabaseConfigured } from "./supabase";
 
 const LOCAL_CASES_KEY = "my_delhi_local_cases_v1";
 
@@ -17,16 +17,6 @@ export type LocalCaseRecord = {
   phone: string | null;
   statusSourceType: "user";
   updatedAt: string;
-};
-
-type ComplaintRow = {
-  report_id: string;
-  authority_slug: string | null;
-  official_reference: string | null;
-  filed_by_user_at: string | null;
-  official_filed_on: string | null;
-  official_tracking_url: string | null;
-  channel_value: string | null;
 };
 
 async function readLocal(): Promise<LocalCaseRecord[]> {
@@ -52,70 +42,77 @@ export async function rememberLocalCase(row: LocalCaseRecord): Promise<void> {
 
 export async function listLocalCases(): Promise<LocalCaseRecord[]> {
   const local = await readLocal();
-  if (!supabaseConfigured || !supabase || !local.length) {
+  if (!apiConfigured || !local.length) {
     return local.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   const ids = local.map((c) => c.caseId);
-  const { data: reports } = await supabase
-    .from("reports")
-    .select(
-      "id, case_id, category_slug, issue_type_slug, selected_authority_slug, user_status, updated_at"
-    )
-    .in("case_id", ids);
-
-  const reportIds = (reports ?? []).map((r) => r.id as string);
-  let complaints: ComplaintRow[] = [];
-  if (reportIds.length) {
-    const { data } = await supabase
-      .from("official_complaints")
-      .select(
-        "report_id, authority_slug, official_reference, filed_by_user_at, official_filed_on, official_tracking_url, channel_value"
-      )
-      .in("report_id", reportIds)
-      .order("created_at", { ascending: false });
-    complaints = (data as ComplaintRow[] | null) ?? [];
-  }
-
-  const complaintByReport = new Map<string, ComplaintRow>();
-  for (const c of complaints) {
-    if (!complaintByReport.has(c.report_id)) {
-      complaintByReport.set(c.report_id, c);
-    }
+  const result = await api.getReportsByCaseIds(ids);
+  if (!result.ok) {
+    return local.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   const byCase = new Map(local.map((c) => [c.caseId, c]));
-  for (const r of reports ?? []) {
-    const caseId = r.case_id as string;
+  for (const r of result.data) {
+    const caseId = String(r.caseId ?? r.case_id ?? "");
+    if (!caseId) continue;
     const prev = byCase.get(caseId);
-    const oc = complaintByReport.get(r.id as string);
-    const channel = oc?.channel_value ?? null;
+    const complaints =
+      (r.complaints as Record<string, unknown>[] | undefined) ?? [];
+    const oc = complaints[0];
+    const channel =
+      (oc?.channelValue as string | null) ??
+      (oc?.channel_value as string | null) ??
+      null;
     byCase.set(caseId, {
       caseId,
-      reportDbId: (r.id as string) ?? prev?.reportDbId ?? null,
-      categorySlug: (r.category_slug as string) ?? prev?.categorySlug ?? null,
+      reportDbId:
+        String(r.id ?? prev?.reportDbId ?? "") || prev?.reportDbId || null,
+      categorySlug:
+        (r.categorySlug as string | null) ??
+        (r.category_slug as string | null) ??
+        prev?.categorySlug ??
+        null,
       issueTypeSlug:
-        (r.issue_type_slug as string) ?? prev?.issueTypeSlug ?? null,
+        (r.issueTypeSlug as string | null) ??
+        (r.issue_type_slug as string | null) ??
+        prev?.issueTypeSlug ??
+        null,
       authoritySlug:
-        (r.selected_authority_slug as string) ??
-        oc?.authority_slug ??
+        (r.selectedAuthoritySlug as string | null) ??
+        (r.selected_authority_slug as string | null) ??
+        (oc?.authoritySlug as string | null) ??
+        (oc?.authority_slug as string | null) ??
         prev?.authoritySlug ??
         null,
       authorityName: prev?.authorityName ?? null,
       officialReference:
-        oc?.official_reference ?? prev?.officialReference ?? null,
+        (oc?.officialReference as string | null) ??
+        (oc?.official_reference as string | null) ??
+        prev?.officialReference ??
+        null,
       filedAt:
-        oc?.official_filed_on ??
-        oc?.filed_by_user_at ??
+        (oc?.officialFiledOn as string | null) ??
+        (oc?.official_filed_on as string | null) ??
+        (oc?.filedByUserAt as string | null) ??
+        (oc?.filed_by_user_at as string | null) ??
         prev?.filedAt ??
         null,
-      userStatus: (r.user_status as string) ?? prev?.userStatus ?? "guided",
-      trackingUrl: oc?.official_tracking_url ?? prev?.trackingUrl ?? null,
-      phone:
-        channel && /^\d/.test(channel) ? channel : (prev?.phone ?? null),
+      userStatus:
+        (r.userStatus as string | null) ??
+        (r.user_status as string | null) ??
+        prev?.userStatus ??
+        "guided",
+      trackingUrl:
+        (oc?.officialTrackingUrl as string | null) ??
+        (oc?.official_tracking_url as string | null) ??
+        prev?.trackingUrl ??
+        null,
+      phone: channel && /^\d/.test(channel) ? channel : (prev?.phone ?? null),
       statusSourceType: "user",
       updatedAt:
-        (r.updated_at as string) ??
+        (r.updatedAt as string | null) ??
+        (r.updated_at as string | null) ??
         prev?.updatedAt ??
         new Date().toISOString(),
     });

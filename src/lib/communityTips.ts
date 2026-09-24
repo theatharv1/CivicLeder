@@ -1,7 +1,7 @@
 import { APP_NAME } from "./brand";
 import { getDeviceHash } from "./deviceId";
 import { storageGetItem, storageSetItem } from "./safeStorage";
-import { supabase, supabaseConfigured } from "./supabase";
+import { api, apiConfigured } from "./apiClient";
 
 export type CommunityTipStatus =
   | "pending"
@@ -160,33 +160,33 @@ async function rememberMyTipId(id: string): Promise<void> {
   }
 }
 
-function mapRemote(row: {
-  id: string;
-  category_slug: string;
-  title: string;
-  body: string;
-  when_to_act: string | null;
-  suggested_channel_label: string | null;
-  suggested_channel_url: string | null;
-  status: string;
-  agree_count: number;
-  disagree_count: number;
-  contributor_device_hash: string;
-  created_at: string;
-}): CommunityTip {
+function mapRemote(row: Record<string, unknown>): CommunityTip {
   return {
-    id: row.id,
-    categorySlug: row.category_slug,
-    title: row.title,
-    body: row.body,
-    whenToAct: row.when_to_act,
-    suggestedChannelLabel: row.suggested_channel_label,
-    suggestedChannelUrl: row.suggested_channel_url,
-    status: row.status as CommunityTipStatus,
-    agreeCount: row.agree_count ?? 0,
-    disagreeCount: row.disagree_count ?? 0,
-    contributorDeviceHash: row.contributor_device_hash,
-    createdAt: row.created_at,
+    id: String(row.id),
+    categorySlug: String(row.categorySlug ?? row.category_slug ?? ""),
+    title: String(row.title ?? ""),
+    body: String(row.body ?? ""),
+    whenToAct:
+      (row.whenToAct as string | null) ??
+      (row.when_to_act as string | null) ??
+      null,
+    suggestedChannelLabel:
+      (row.suggestedChannelLabel as string | null) ??
+      (row.suggested_channel_label as string | null) ??
+      null,
+    suggestedChannelUrl:
+      (row.suggestedChannelUrl as string | null) ??
+      (row.suggested_channel_url as string | null) ??
+      null,
+    status: String(row.status ?? "pending") as CommunityTipStatus,
+    agreeCount: Number(row.agreeCount ?? row.agree_count ?? 0),
+    disagreeCount: Number(row.disagreeCount ?? row.disagree_count ?? 0),
+    contributorDeviceHash: String(
+      row.contributorDeviceHash ?? row.contributor_device_hash ?? ""
+    ),
+    createdAt: String(
+      row.createdAt ?? row.created_at ?? new Date().toISOString()
+    ),
   };
 }
 
@@ -232,18 +232,10 @@ export async function listCommunityTips(options?: {
   const localVotes = await loadLocalVotes();
   let rows: CommunityTip[] = [];
 
-  if (supabaseConfigured && supabase) {
-    const { data, error } = await supabase
-      .from("community_tips")
-      .select(
-        "id, category_slug, title, body, when_to_act, suggested_channel_label, suggested_channel_url, status, agree_count, disagree_count, contributor_device_hash, created_at"
-      )
-      .in("status", PUBLIC_STATUSES)
-      .order("created_at", { ascending: false })
-      .limit(80);
-
-    if (!error && data) {
-      rows = data.map(mapRemote);
+  if (apiConfigured) {
+    const result = await api.listCommunityTips(options?.categorySlug ?? undefined);
+    if (result.ok) {
+      rows = result.data.map(mapRemote);
     }
   }
 
@@ -284,23 +276,21 @@ export async function submitCommunityTip(
   const channelLabel = input.channelLabel?.trim() || null;
   const channelUrl = input.channelUrl?.trim() || null;
 
-  if (supabaseConfigured && supabase) {
-    const { data, error } = await supabase.rpc("submit_community_tip", {
-      p_device_hash: hash,
-      p_category_slug: input.categorySlug,
-      p_title: title,
-      p_body: body,
-      p_when_to_act: whenToAct,
-      p_channel_label: channelLabel,
-      p_channel_url: channelUrl,
+  if (apiConfigured) {
+    const result = await api.submitCommunityTip({
+      deviceHash: hash,
+      categorySlug: input.categorySlug,
+      title,
+      body,
+      whenToAct,
+      channelLabel,
+      channelUrl,
     });
-
-    if (!error && data) {
-      const id = String(data);
+    if (result.ok && result.data.id) {
+      const id = String(result.data.id);
       await rememberMyTipId(id);
       return { ok: true, id };
     }
-    // Fall through to local if RPC missing
   }
 
   const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -341,13 +331,12 @@ export async function voteCommunityTip(
     return { ok: false, error: "This tip is closed." };
   }
 
-  if (supabaseConfigured && supabase && !tipId.startsWith("local-")) {
-    const { data, error } = await supabase.rpc("vote_community_tip", {
-      p_tip_id: tipId,
-      p_device_hash: hash,
-      p_vote: vote,
+  if (apiConfigured && !tipId.startsWith("local-")) {
+    const result = await api.voteCommunityTip(tipId, {
+      deviceHash: hash,
+      vote,
     });
-    if (!error && data) {
+    if (result.ok) {
       const votes = await loadLocalVotes();
       votes[tipId] = vote;
       await saveLocalVotes(votes);
@@ -355,9 +344,9 @@ export async function voteCommunityTip(
         ok: true,
         tip: {
           ...tip,
-          status: (data as { status: CommunityTipStatus }).status,
-          agreeCount: (data as { agree_count: number }).agree_count,
-          disagreeCount: (data as { disagree_count: number }).disagree_count,
+          status: result.data.status as CommunityTipStatus,
+          agreeCount: result.data.agree_count,
+          disagreeCount: result.data.disagree_count,
           myVote: vote,
         },
       };

@@ -9,7 +9,7 @@ import { FALLBACK_WATER_DRAINAGE_SERVICES } from "../data/waterDrainageFallback"
 import { FALLBACK_WASTE_GARBAGE_SERVICES } from "../data/wasteGarbageFallback";
 import { FALLBACK_ROADS_PUBLIC_SPACES_SERVICES } from "../data/roadsPublicSpacesFallback";
 import { FALLBACK_ENVIRONMENT_SERVICES } from "../data/environmentFallback";
-import { supabase, supabaseConfigured } from "./supabase";
+import { api, apiConfigured } from "./apiClient";
 
 function dfsFallbacks(preferEmergency?: boolean): AuthorityService[] {
   if (preferEmergency) {
@@ -391,83 +391,66 @@ export async function fetchAuthorityServices(
     return opts?.preferEmergency ? dfsFallbacks(true) : [];
   }
 
-  if (!supabaseConfigured || !supabase) {
+  if (!apiConfigured) {
     return offlineAuthorityServices(authoritySlug, opts);
   }
 
-  const { data: auth, error: authErr } = await supabase
-    .from("authorities")
-    .select("id, slug")
-    .eq("slug", authoritySlug)
-    .eq("active", true)
-    .maybeSingle();
-
-  if (authErr || !auth?.id) {
+  const result = await api.getAuthorityServices(authoritySlug);
+  if (!result.ok) {
     return offlineAuthorityServices(authoritySlug, opts);
   }
 
-  const { data: services, error: svcErr } = await supabase
-    .from("authority_services")
-    .select(
-      "id, slug, service_name, description, service_type, official_url, filing_url, tracking_url, phone, integration_type"
-    )
-    .eq("authority_id", auth.id)
-    .eq("active", true)
-    .order("service_type", { ascending: true });
-
-  if (svcErr || !services?.length) {
+  const services = (result.data.services ?? []) as Record<string, unknown>[];
+  if (!services.length) {
     return offlineAuthorityServices(authoritySlug, opts);
-  }
-
-  const ids = services.map((s) => s.id as string);
-  const { data: fields } = await supabase
-    .from("authority_service_fields")
-    .select(
-      "service_id, field_key, label, description, field_type, requiredness, sort_order"
-    )
-    .in("service_id", ids)
-    .eq("active", true)
-    .order("sort_order", { ascending: true });
-
-  const fieldMap = new Map<string, AuthorityServiceField[]>();
-  for (const f of fields ?? []) {
-    const list = fieldMap.get(f.service_id as string) ?? [];
-    list.push({
-      field_key: f.field_key,
-      label: f.label,
-      description: f.description,
-      field_type: f.field_type,
-      requiredness: (f.requiredness as AuthorityServiceField["requiredness"]) ??
-        "recommended",
-      sort_order: f.sort_order ?? 0,
-    });
-    fieldMap.set(f.service_id as string, list);
   }
 
   return services.map((s) => {
-    const isDfsComplaint = s.slug === "dfs_complaint_grievances_info";
+    const fieldsRaw = (s.fields as Record<string, unknown>[] | undefined) ?? [];
+    const serviceKey = String(s.serviceKey ?? s.slug ?? "");
+    const isDfsComplaint = serviceKey === "dfs_complaint_grievances_info";
     const filingUrl =
+      (s.actionUrl as string | null) ??
       (s.filing_url as string | null) ??
       (isDfsComplaint ? DFS_COMPLAINT_URL : null);
     return {
-      id: s.id as string,
-      slug: s.slug,
-      service_name: s.service_name,
-      description: s.description,
-      service_type: isDfsComplaint
-        ? (s.service_type === "information" ? "grievance" : s.service_type)
-        : s.service_type,
+      id: String(s.id),
+      slug: serviceKey,
+      service_name: String(s.title ?? s.service_name ?? ""),
+      description: (s.description as string | null) ?? null,
+      service_type: String(s.channelType ?? s.service_type ?? "information"),
       official_url:
+        (s.actionUrl as string | null) ??
         (s.official_url as string | null) ??
         (isDfsComplaint ? DFS_COMPLAINT_URL : null),
       filing_url: filingUrl,
-      tracking_url: s.tracking_url,
-      phone: s.phone,
-      integration_type: s.integration_type,
+      tracking_url:
+        (s.trackingUrl as string | null) ??
+        (s.tracking_url as string | null) ??
+        null,
+      phone:
+        (s.channelValue as string | null) ?? (s.phone as string | null) ?? null,
+      integration_type: "" as string,
       authority_slug: authoritySlug,
       fields:
-        fieldMap.get(s.id as string) ??
-        (isDfsComplaint ? DFS_COMPLAINT_SERVICE_FALLBACK.fields : []),
+        fieldsRaw.length > 0
+          ? fieldsRaw.map((f) => ({
+              field_key: String(f.fieldKey ?? f.field_key ?? ""),
+              label: String(f.label ?? ""),
+              description:
+                (f.helpText as string | null) ??
+                (f.description as string | null) ??
+                null,
+              field_type: String(f.fieldType ?? f.field_type ?? "text"),
+              requiredness: (f.required
+                ? "required"
+                : ((f.requiredness as AuthorityServiceField["requiredness"]) ??
+                  "recommended")) as AuthorityServiceField["requiredness"],
+              sort_order: Number(f.sortOrder ?? f.sort_order ?? 0),
+            }))
+          : isDfsComplaint
+            ? DFS_COMPLAINT_SERVICE_FALLBACK.fields
+            : [],
     };
   });
 }

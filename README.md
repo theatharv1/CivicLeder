@@ -36,4 +36,15 @@ Or open `website/index.html` in a browser.
 
 ## Backend
 
-See `backend/APPLY_INSTRUCTIONS.md`.
+- **Runtime API:** `server/` (Node + Express + Prisma + MySQL). See `server/README.md`.
+- **Legacy Supabase SQL (reference only):** `backend/` — see `backend/APPLY_INSTRUCTIONS.md`.
+
+## Deploy
+
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) and [`MIGRATION_REPORT.md`](./MIGRATION_REPORT.md).
+
+Mobile env:
+
+```bash
+EXPO_PUBLIC_API_URL=http://localhost:3000/api/v1
+```

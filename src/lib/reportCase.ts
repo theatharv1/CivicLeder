@@ -1,15 +1,14 @@
 import { rememberLocalCase } from "./myCases";
-import { supabase, supabaseConfigured } from "./supabase";
+import { api, apiConfigured } from "./apiClient";
 
 /** Generate internal CivicLeder case ID (NOT a government complaint ID). */
 export async function generateCivicLederCaseId(): Promise<string> {
-  if (supabaseConfigured && supabase) {
-    const { data, error } = await supabase.rpc("next_my_delhi_case_id");
-    if (!error && typeof data === "string" && data.startsWith("MD-")) {
-      return data;
+  if (apiConfigured) {
+    const result = await api.nextCaseId();
+    if (result.ok && result.data.caseId?.startsWith("MD-")) {
+      return result.data.caseId;
     }
   }
-  // Local fallback — still MD-###### style; not an official reference
   const n = Date.now() % 1_000_000;
   return `MD-${String(n).padStart(6, "0")}`;
 }
@@ -29,28 +28,18 @@ export type PersistReportInput = {
 export async function persistReport(
   input: PersistReportInput
 ): Promise<string | null> {
-  if (!supabaseConfigured || !supabase) return null;
-
-  const { data, error } = await supabase
-    .from("reports")
-    .upsert(
-      {
-        case_id: input.caseId,
-        category_slug: input.categorySlug,
-        issue_type_slug: input.issueTypeSlug,
-        emergency_result: input.emergencyResult,
-        selected_authority_slug: input.selectedAuthoritySlug,
-        user_status: input.userStatus,
-        status_source_type: "user",
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "case_id" }
-    )
-    .select("id")
-    .maybeSingle();
-
-  if (error || !data?.id) return null;
-  return data.id as string;
+  if (!apiConfigured) return null;
+  const result = await api.upsertReport({
+    caseId: input.caseId,
+    categorySlug: input.categorySlug,
+    issueTypeSlug: input.issueTypeSlug,
+    emergencyResult: input.emergencyResult,
+    selectedAuthoritySlug: input.selectedAuthoritySlug,
+    userStatus: input.userStatus,
+    statusSourceType: "user",
+  });
+  if (!result.ok) return null;
+  return result.data.id;
 }
 
 export async function persistOfficialComplaint(input: {
@@ -66,28 +55,21 @@ export async function persistOfficialComplaint(input: {
   userConfirmedFiled: boolean;
   officialFiledOn: string | null;
 }): Promise<boolean> {
-  if (!supabaseConfigured || !supabase || !input.reportId) return false;
-
-  const row: Record<string, unknown> = {
-    report_id: input.reportId,
-    authority_slug: input.authoritySlug,
-    channel_type: input.channelType,
-    channel_value: input.channelValue,
-    has_official_reference: input.hasOfficialReference,
-    official_reference: input.officialReference,
-    filed_by_user_at: new Date().toISOString(),
-    recorded_by: "user",
-    user_confirmed_filed: input.userConfirmedFiled,
-    official_submission_url: input.officialSubmissionUrl,
-    official_tracking_url: input.officialTrackingUrl,
-    official_filed_on: input.officialFiledOn,
-  };
-  if (input.serviceId) {
-    row.service_id = input.serviceId;
-  }
-
-  const { error } = await supabase.from("official_complaints").insert(row);
-  return !error;
+  if (!apiConfigured || !input.reportId) return false;
+  const result = await api.createComplaint({
+    reportId: input.reportId,
+    authoritySlug: input.authoritySlug,
+    serviceId: input.serviceId,
+    channelType: input.channelType,
+    channelValue: input.channelValue,
+    hasOfficialReference: input.hasOfficialReference,
+    officialReference: input.officialReference,
+    userConfirmedFiled: input.userConfirmedFiled,
+    officialSubmissionUrl: input.officialSubmissionUrl,
+    officialTrackingUrl: input.officialTrackingUrl,
+    officialFiledOn: input.officialFiledOn,
+  });
+  return result.ok;
 }
 
 export async function persistCaseUpdate(input: {
@@ -95,13 +77,11 @@ export async function persistCaseUpdate(input: {
   status: string;
   message: string;
 }): Promise<void> {
-  if (!supabaseConfigured || !supabase || !input.reportId) return;
-  await supabase.from("case_updates").insert({
-    report_id: input.reportId,
+  if (!apiConfigured || !input.reportId) return;
+  await api.createCaseUpdate({
+    reportId: input.reportId,
     status: input.status,
     message: input.message,
-    recorded_by: "user",
-    status_source_type: "user",
   });
 }
 

@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { Alert } from "react-native";
-import { supabase, supabaseConfigured } from "./supabase";
+import { api, apiConfigured } from "./apiClient";
 
 export type EvidenceItem = {
   id: string;
@@ -185,32 +185,36 @@ export async function recordVideo(
 }
 
 /**
- * Upload to private Supabase Storage bucket `report-evidence`.
- * Requires bucket created manually. Returns storage path or null.
+ * Upload evidence to backend storage via API.
+ * Returns storage path or null (draft keeps localUri on failure).
  */
 export async function uploadEvidenceToStorage(
   item: EvidenceItem,
   draftKey: string
 ): Promise<string | null> {
-  if (!supabaseConfigured || !supabase) return null;
-
-  const ext =
-    item.mediaType === "video"
-      ? "mp4"
-      : item.fileName?.split(".").pop() || "jpg";
-  const path = `${draftKey}/${item.id}.${ext}`;
+  if (!apiConfigured) return null;
 
   try {
-    const response = await fetch(item.localUri);
-    const blob = await response.blob();
-    const { error } = await supabase.storage
-      .from("report-evidence")
-      .upload(path, blob, {
-        contentType: item.mimeType ?? undefined,
-        upsert: true,
-      });
-    if (error) return null;
-    return path;
+    const form = new FormData();
+    form.append("draftKey", draftKey);
+    form.append("evidenceId", item.id);
+    form.append("mediaType", item.mediaType);
+    form.append(
+      "file",
+      {
+        uri: item.localUri,
+        name:
+          item.fileName ??
+          `${item.id}.${item.mediaType === "video" ? "mp4" : "jpg"}`,
+        type:
+          item.mimeType ??
+          (item.mediaType === "video" ? "video/mp4" : "image/jpeg"),
+      } as unknown as Blob
+    );
+
+    const result = await api.uploadEvidence(form);
+    if (!result.ok) return null;
+    return result.data.storagePath;
   } catch {
     return null;
   }

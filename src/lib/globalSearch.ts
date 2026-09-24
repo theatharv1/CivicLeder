@@ -11,7 +11,7 @@ import { WASTE_GARBAGE_GROUPS } from "../data/wasteGarbageKnowledge";
 import { WATER_DRAINAGE_GROUPS } from "../data/waterDrainageKnowledge";
 import { ROADS_PUBLIC_SPACES_GROUPS } from "../data/roadsPublicSpacesKnowledge";
 import { ELECTRICITY_KNOWLEDGE_CARDS } from "../data/electricityKnowledge";
-import { supabase, supabaseConfigured } from "./supabase";
+import { api, apiConfigured } from "./apiClient";
 
 export type GlobalSearchKind =
   | "category"
@@ -357,90 +357,61 @@ export async function searchGlobal(
   limit = 20
 ): Promise<GlobalSearchHit[]> {
   const offline = searchOffline(query, limit);
-  if (!supabaseConfigured || !supabase || !query.trim()) {
+  if (!apiConfigured || !query.trim()) {
     return offline;
   }
 
   try {
-    const q = `%${query.trim()}%`;
+    const result = await api.search(query.trim());
+    if (!result.ok) return offline;
+
     const extras: GlobalSearchHit[] = [];
+    for (const row of result.data.issueTypes as Record<string, unknown>[]) {
+      extras.push({
+        id: `db_type_${row.slug}`,
+        kind: "issue",
+        title: String(row.name ?? ""),
+        subtitle: String(
+          row.shortDescription ?? row.short_description ?? row.slug ?? ""
+        ),
+        confidenceLabel: "may be",
+        issueSlug: String(row.slug ?? ""),
+      });
+    }
+    for (const row of result.data.officialServices as Record<
+      string,
+      unknown
+    >[]) {
+      extras.push({
+        id: `db_svc_${row.slug}`,
+        kind: "service",
+        title: String(row.name ?? ""),
+        subtitle: String(row.description ?? "Official service"),
+        confidenceLabel: "official",
+        url: (row.url as string | null) ?? (row.official_url as string | null),
+        phone: (row.phone as string | null) ?? null,
+      });
+    }
+    for (const row of result.data.citizenRights as Record<string, unknown>[]) {
+      extras.push({
+        id: `db_right_${row.slug}`,
+        kind: "right",
+        title: String(row.title ?? ""),
+        subtitle: String(row.body ?? "Citizen right / guidance"),
+        confidenceLabel: "official",
+        url: (row.sourceUrl as string | null) ?? (row.source_url as string | null),
+      });
+    }
 
-    const { data: types } = await supabase
-      .from("issue_types")
-      .select("slug, name, short_description, category_id")
-      .eq("active", true)
-      .or(`name.ilike.${q},short_description.ilike.${q},slug.ilike.${q}`)
-      .limit(8);
-
-    if (types?.length) {
-      for (const row of types) {
-        extras.push({
-          id: `db_type_${row.slug}`,
-          kind: "issue",
-          title: row.name,
-          subtitle: row.short_description ?? row.slug,
-          confidenceLabel: "may be",
-          issueSlug: row.slug,
-        });
+    const seen = new Set(offline.map((h) => h.id));
+    const merged = [...offline];
+    for (const hit of extras) {
+      if (!seen.has(hit.id)) {
+        seen.add(hit.id);
+        merged.push(hit);
       }
     }
-
-    const { data: services } = await supabase
-      .from("official_services")
-      .select(
-        "slug, name, description, official_url, tracking_url, phone, play_store_url, app_store_url, purpose"
-      )
-      .eq("active", true)
-      .or(`name.ilike.${q},description.ilike.${q},purpose.ilike.${q}`)
-      .limit(8);
-
-    if (services?.length) {
-      for (const row of services) {
-        extras.push({
-          id: `db_svc_${row.slug}`,
-          kind: "service",
-          title: row.name,
-          subtitle: row.description ?? row.purpose ?? "Official service",
-          confidenceLabel: "official",
-          url: row.official_url,
-          phone: row.phone,
-          playStoreUrl: row.play_store_url,
-          appStoreUrl: row.app_store_url,
-        });
-      }
-    }
-
-    const { data: rights } = await supabase
-      .from("citizen_rights")
-      .select("slug, title, short_description, official_action_url")
-      .eq("active", true)
-      .or(`title.ilike.${q},short_description.ilike.${q}`)
-      .limit(6);
-
-    if (rights?.length) {
-      for (const row of rights) {
-        extras.push({
-          id: `db_right_${row.slug}`,
-          kind: "right",
-          title: row.title,
-          subtitle: row.short_description ?? "Citizen right / guidance",
-          confidenceLabel: "official",
-          url: row.official_action_url,
-        });
-      }
-    }
-
-    const merged = [...extras, ...offline];
-    const seen = new Set<string>();
-    const unique: GlobalSearchHit[] = [];
-    for (const hit of merged) {
-      const key = `${hit.kind}:${hit.title}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      unique.push(hit);
-      if (unique.length >= limit) break;
-    }
-    return unique;
+    return merged.slice(0, limit);
   } catch {
     return offline;
   }

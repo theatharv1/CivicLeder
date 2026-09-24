@@ -12,7 +12,7 @@ import { FALLBACK_WATER_DRAINAGE_ROUTING } from "../data/waterDrainageFallback";
 import { FALLBACK_WASTE_GARBAGE_ROUTING } from "../data/wasteGarbageFallback";
 import { FALLBACK_ROADS_PUBLIC_SPACES_ROUTING } from "../data/roadsPublicSpacesFallback";
 import { FALLBACK_ENVIRONMENT_ROUTING } from "../data/environmentFallback";
-import { supabase, supabaseConfigured } from "./supabase";
+import { api, apiConfigured } from "./apiClient";
 
 /** Map app category ids to DB slugs where they differ. */
 function dbCategorySlug(categorySlug: string): string[] {
@@ -140,80 +140,78 @@ export function whatsappUrl(number: string): string {
 export async function fetchLikelyAuthorities(
   categorySlug: string
 ): Promise<RoutedAuthority[]> {
-  if (!supabaseConfigured || !supabase) {
+  if (!apiConfigured) {
     return offlineFallback(categorySlug);
   }
 
-  const slugs = dbCategorySlug(categorySlug);
+  const slug = dbCategorySlug(categorySlug)[0];
+  const result = await api.getRouting(slug);
+  if (!result.ok) return offlineFallback(categorySlug);
 
-  const { data: categories, error: catErr } = await supabase
-    .from("issue_categories")
-    .select("id, slug")
-    .in("slug", slugs)
-    .eq("active", true);
-
-  if (catErr || !categories?.length) {
-    return offlineFallback(categorySlug);
-  }
-
-  const categoryIds = categories.map((c) => c.id);
-
-  const { data: rules, error: rulesErr } = await supabase
-    .from("routing_rules")
-    .select(
-      "confidence, routing_mode, is_primary, notes, authority_id, authorities ( slug, name, short_description, official_website, emergency_number )"
-    )
-    .in("category_id", categoryIds)
-    .eq("active", true)
-    .is("issue_type_id", null);
-
-  if (rulesErr || !rules?.length) {
-    return offlineFallback(categorySlug);
-  }
-
-  const authorityIds = rules
-    .map((r) => r.authority_id as string)
-    .filter(Boolean);
-
-  const { data: channels } = await supabase
-    .from("authority_channels")
-    .select(
-      "authority_id, channel_type, label, value, action_url, tracking_url, email, whatsapp, phone, purpose, priority, geography, requires_login, requires_otp, requires_captcha, instructions"
-    )
-    .in("authority_id", authorityIds)
-    .eq("active", true);
+  const rules = (result.data.rules ?? []) as Record<string, unknown>[];
+  const channels = (result.data.channels ?? []) as Record<string, unknown>[];
+  if (!rules.length) return offlineFallback(categorySlug);
 
   const channelMap = new Map<string, AuthorityChannel[]>();
-  for (const ch of channels ?? []) {
-    const list = channelMap.get(ch.authority_id) ?? [];
-    list.push(mapChannel(ch));
-    channelMap.set(ch.authority_id, list);
+  for (const ch of channels) {
+    const authId = String(ch.authorityId ?? ch.authority_id ?? "");
+    const list = channelMap.get(authId) ?? [];
+    list.push(
+      mapChannel({
+        channel_type: String(ch.channelType ?? ch.channel_type ?? "other"),
+        label: (ch.label as string | null) ?? null,
+        value: String(ch.value ?? ""),
+        action_url:
+          (ch.actionUrl as string | null) ??
+          (ch.action_url as string | null) ??
+          null,
+        tracking_url:
+          (ch.trackingUrl as string | null) ??
+          (ch.tracking_url as string | null) ??
+          null,
+        email: null,
+        whatsapp: null,
+        phone:
+          ch.channelType === "phone" || ch.channel_type === "phone"
+            ? String(ch.value ?? "")
+            : null,
+        purpose: null,
+        priority: null,
+        geography: null,
+        requires_login: null,
+        requires_otp: null,
+        requires_captcha: null,
+        instructions: null,
+      })
+    );
+    channelMap.set(authId, list);
   }
-
-  type AuthRow = {
-    slug: string;
-    name: string;
-    short_description: string | null;
-    official_website: string | null;
-    emergency_number: string | null;
-  };
 
   const mapped: RoutedAuthority[] = [];
   for (const rule of rules) {
-    const raw = rule.authorities as AuthRow | AuthRow[] | null | undefined;
-    const auth = Array.isArray(raw) ? raw[0] : raw;
+    const auth = rule.authority as Record<string, unknown> | undefined;
     if (!auth?.slug) continue;
+    const authorityId = String(rule.authorityId ?? rule.authority_id ?? "");
     mapped.push({
-      slug: auth.slug,
-      name: auth.name,
-      short_description: auth.short_description,
-      official_website: auth.official_website,
-      emergency_number: auth.emergency_number,
+      slug: String(auth.slug),
+      name: String(auth.name ?? ""),
+      short_description:
+        (auth.shortDescription as string | null) ??
+        (auth.short_description as string | null) ??
+        null,
+      official_website:
+        (auth.officialWebsite as string | null) ??
+        (auth.official_website as string | null) ??
+        null,
+      emergency_number:
+        (auth.emergencyNumber as string | null) ??
+        (auth.emergency_number as string | null) ??
+        null,
       confidence: mapConfidence(rule.confidence),
-      routing_mode: (rule.routing_mode as string) ?? "conditional",
-      is_primary: Boolean(rule.is_primary),
-      notes: rule.notes,
-      channels: channelMap.get(rule.authority_id as string) ?? [],
+      routing_mode: String(rule.routingMode ?? rule.routing_mode ?? "conditional"),
+      is_primary: Boolean(rule.isPrimary ?? rule.is_primary),
+      notes: (rule.notes as string | null) ?? null,
+      channels: channelMap.get(authorityId) ?? [],
     });
   }
 
