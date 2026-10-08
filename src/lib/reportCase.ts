@@ -1,5 +1,6 @@
 import { rememberLocalCase } from "./myCases";
 import { api, apiConfigured } from "./apiClient";
+import { normalizeTrackingUrl } from "./trackingUrls";
 
 /** Generate internal CivicLeder case ID (NOT a government complaint ID). */
 export async function generateCivicLederCaseId(): Promise<string> {
@@ -108,7 +109,7 @@ export async function saveUserFiledCase(input: {
     officialReference: input.officialReference,
     filedAt: input.filedAt,
     userStatus: input.userStatus,
-    trackingUrl: input.trackingUrl,
+    trackingUrl: normalizeTrackingUrl(input.trackingUrl),
     phone: input.phone,
     statusSourceType: "user",
     updatedAt: new Date().toISOString(),

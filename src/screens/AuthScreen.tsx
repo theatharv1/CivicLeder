@@ -23,8 +23,10 @@ export default function AuthScreen({ navigation, route }: Props) {
   const mode = route.params?.mode ?? "create";
   const { createProfile, logInWithPassword } = useProfile();
   const [username, setUsername] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [login, setLogin] = useState("");
   const [busy, setBusy] = useState(false);
 
   const isCreate = mode === "create";
@@ -32,18 +34,19 @@ export default function AuthScreen({ navigation, route }: Props) {
   const onSubmit = async () => {
     setBusy(true);
     const result = isCreate
-      ? await createProfile(username, password, displayName)
-      : await logInWithPassword(username, password);
+      ? await createProfile({
+          username,
+          password,
+          phone,
+          address,
+        })
+      : await logInWithPassword(login, password);
     setBusy(false);
     if (!result.ok) {
       Alert.alert("Could not continue", result.error);
       return;
     }
-    Alert.alert(
-      isCreate ? "Profile created" : "Signed in",
-      "Public posts stay anonymous. Your username is never shown on alerts or tips.",
-      [{ text: "OK", onPress: () => navigation.goBack() }]
-    );
+    navigation.goBack();
   };
 
   return (
@@ -63,50 +66,76 @@ export default function AuthScreen({ navigation, route }: Props) {
         <Text style={styles.title}>
           {isCreate ? "Create profile" : "Sign in"}
         </Text>
-        <Text style={styles.lead}>
-          {isCreate
-            ? "Optional. Use a username and password saved on this phone. You can keep using the app as a guest."
-            : "Sign in with the username and password you created on this phone."}
-        </Text>
-        <Text style={styles.anonNote}>
-          Public alerts and tips are always anonymous. Signing in does not put
-          your name on posts.
-        </Text>
-
-        <Text style={styles.label}>Username</Text>
-        <TextInput
-          style={styles.input}
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="e.g. delhiwalker"
-          placeholderTextColor={colors.muted}
-        />
 
         {isCreate ? (
           <>
-            <Text style={styles.label}>Display name (optional)</Text>
+            <Text style={styles.label}>Username</Text>
             <TextInput
               style={styles.input}
-              value={displayName}
-              onChangeText={setDisplayName}
-              placeholder="Only shown to you in Profile"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Choose a username"
+              placeholderTextColor={colors.muted}
+            />
+
+            <Text style={styles.label}>Mobile number</Text>
+            <TextInput
+              style={styles.input}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              placeholder="10-digit mobile"
+              placeholderTextColor={colors.muted}
+            />
+
+            <Text style={styles.label}>Address</Text>
+            <TextInput
+              style={[styles.input, styles.area]}
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Area / locality"
+              placeholderTextColor={colors.muted}
+              multiline
+            />
+
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              placeholder="At least 6 characters"
               placeholderTextColor={colors.muted}
             />
           </>
-        ) : null}
-
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          placeholder="At least 6 characters"
-          placeholderTextColor={colors.muted}
-        />
+        ) : (
+          <>
+            <Text style={styles.label}>Mobile or username</Text>
+            <TextInput
+              style={styles.input}
+              value={login}
+              onChangeText={setLogin}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="default"
+              placeholder="Mobile or username"
+              placeholderTextColor={colors.muted}
+            />
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              placeholder="Password"
+              placeholderTextColor={colors.muted}
+            />
+          </>
+        )}
 
         <Pressable
           style={[styles.save, busy && { opacity: 0.7 }]}
@@ -129,9 +158,7 @@ export default function AuthScreen({ navigation, route }: Props) {
           }
         >
           <Text style={styles.switchText}>
-            {isCreate
-              ? "Already have a profile? Sign in"
-              : "Need a profile? Create one"}
+            {isCreate ? "Sign in instead" : "Create a profile"}
           </Text>
         </Pressable>
       </ScrollView>
@@ -154,22 +181,10 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     color: colors.navy,
-  },
-  lead: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.mutedDark,
-  },
-  anonNote: {
-    marginTop: 10,
-    fontSize: 13,
-    lineHeight: 19,
-    color: colors.primaryBlue,
-    fontWeight: "600",
+    marginBottom: 8,
   },
   label: {
-    marginTop: 16,
+    marginTop: 14,
     fontSize: 13,
     fontWeight: "700",
     color: colors.mutedDark,
@@ -183,6 +198,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: colors.navy,
+  },
+  area: {
+    minHeight: 72,
+    textAlignVertical: "top",
   },
   save: {
     marginTop: 28,
@@ -204,7 +223,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   switchText: {
-    color: colors.primaryBlue,
+    color: colors.linkBlue,
     fontWeight: "700",
     fontSize: 14,
   },

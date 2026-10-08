@@ -7,6 +7,7 @@ import type { AuthorityChannel, RoutedAuthority } from "./routingFallback";
 import type { IssueTypeRow, AssessmentQuestion } from "./emergencyFallback";
 import type { FallbackAuthorityService } from "./dfsEmergencyFieldsFallback";
 import { WATER_DRAINAGE_GROUPS } from "./waterDrainageKnowledge";
+import { MCD311_CREATE, MCD311_TRACK } from "./mcd311Urls";
 
 /** Offline Step 2 list uses groups as selectable “issue types”. */
 export const FALLBACK_WATER_DRAINAGE_ISSUE_TYPES: IssueTypeRow[] =
@@ -208,9 +209,10 @@ export const FALLBACK_WATER_DRAINAGE_ROUTING: RoutedAuthority[] = [
       }),
       ch({
         channel_type: "website",
-        label: "MCD Online feedback",
-        value: "https://mcdonline.nic.in/portal/feedback",
-        action_url: "https://mcdonline.nic.in/portal/feedback",
+        label: "MCD311 file / track",
+        value: "https://mcdonline.nic.in/",
+        action_url: MCD311_CREATE,
+        tracking_url: MCD311_TRACK,
         purpose: "web_portal",
       }),
     ],
@@ -393,8 +395,8 @@ export const FALLBACK_WATER_DRAINAGE_SERVICES: Record<
         "155305 and MCD311 listed on mcdonline feedback page. Confirm MCD area for drainage/waterlogging.",
       service_type: "complaint",
       official_url: "https://mcdonline.nic.in/portal/feedback",
-      filing_url: "https://mcdonline.nic.in/portal/feedback",
-      tracking_url: null,
+      filing_url: MCD311_CREATE,
+      tracking_url: MCD311_TRACK,
       phone: "155305",
       integration_type: "phone",
       authority_slug: "mcd",

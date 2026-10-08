@@ -7,11 +7,7 @@ import type { AuthorityChannel, RoutedAuthority } from "./routingFallback";
 import type { IssueTypeRow, AssessmentQuestion } from "./emergencyFallback";
 import type { FallbackAuthorityService } from "./dfsEmergencyFieldsFallback";
 import { WASTE_GARBAGE_GROUPS } from "./wasteGarbageKnowledge";
-
-const MCD_CREATE =
-  "https://mcd.everythingcivic.com/citizen/createissue?app_id=U2FsdGVkX180J3mGnJmT5QpgtPjhfjtzyXAAccBUxGU%3D&api_key=e34ba86d3943bd6db9120313da011937189e6a9625170905750f649395bcd68312cf10d264c9305d57c23688cc2e5120";
-const MCD_TRACK =
-  "https://mcd.everythingcivic.com/citizen/issuedetail?app_id=U2FsdGVkX180J3mGnJmT5QpgtPjhfjtzyXAAccBUxGU%3D&api_key=e34ba86d3943bd6db9120313da011937189e6a9625170905750f649395bcd68312cf10d264c9305d57c23688cc2e5120";
+import { MCD311_CREATE as MCD_CREATE, MCD311_TRACK as MCD_TRACK } from "./mcd311Urls";
 
 /** Offline Step 2 list uses groups as selectable “issue types”. */
 export const FALLBACK_WASTE_GARBAGE_ISSUE_TYPES: IssueTypeRow[] =

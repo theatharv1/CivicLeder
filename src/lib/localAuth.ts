@@ -9,6 +9,9 @@ export type LocalAccount = {
   passwordHash: string;
   salt: string;
   displayName: string;
+  /** 10-digit Indian mobile (digits only). */
+  phone: string;
+  address: string;
   createdAt: string;
 };
 
@@ -16,8 +19,23 @@ export type AuthSession = {
   username: string;
 };
 
+export type CreateAccountInput = {
+  username: string;
+  password: string;
+  phone: string;
+  address: string;
+  displayName?: string;
+};
+
 function normalizeUsername(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+export function normalizePhone(raw: string): string {
+  const d = raw.replace(/\D/g, "");
+  if (d.length === 12 && d.startsWith("91")) return d.slice(2);
+  if (d.length === 11 && d.startsWith("0")) return d.slice(1);
+  return d;
 }
 
 function randomSalt(): string {
@@ -54,7 +72,13 @@ async function readAccounts(): Promise<LocalAccount[]> {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as LocalAccount[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // Migrate older accounts missing phone/address.
+    return parsed.map((a) => ({
+      ...a,
+      phone: a.phone ?? "",
+      address: a.address ?? "",
+    }));
   } catch {
     return [];
   }
@@ -100,28 +124,51 @@ export function validatePassword(password: string): string | null {
   return null;
 }
 
-export async function createAccount(
-  usernameRaw: string,
-  password: string,
-  displayName?: string
-): Promise<{ ok: true; account: LocalAccount } | { ok: false; error: string }> {
-  const userErr = validateUsername(usernameRaw);
-  if (userErr) return { ok: false, error: userErr };
-  const passErr = validatePassword(password);
-  if (passErr) return { ok: false, error: passErr };
+export function validatePhone(phone: string): string | null {
+  const d = normalizePhone(phone);
+  if (d.length !== 10) return "Enter a valid 10-digit mobile number.";
+  if (!/^[6-9]\d{9}$/.test(d)) return "Enter a valid Indian mobile number.";
+  return null;
+}
 
-  const username = normalizeUsername(usernameRaw);
+export function validateAddress(address: string): string | null {
+  const a = address.trim();
+  if (a.length < 5) return "Enter your address (area / locality).";
+  if (a.length > 200) return "Address is too long.";
+  return null;
+}
+
+export async function createAccount(
+  input: CreateAccountInput
+): Promise<{ ok: true; account: LocalAccount } | { ok: false; error: string }> {
+  const userErr = validateUsername(input.username);
+  if (userErr) return { ok: false, error: userErr };
+  const passErr = validatePassword(input.password);
+  if (passErr) return { ok: false, error: passErr };
+  const phoneErr = validatePhone(input.phone);
+  if (phoneErr) return { ok: false, error: phoneErr };
+  const addrErr = validateAddress(input.address);
+  if (addrErr) return { ok: false, error: addrErr };
+
+  const username = normalizeUsername(input.username);
+  const phone = normalizePhone(input.phone);
+  const address = input.address.trim();
   const accounts = await readAccounts();
   if (accounts.some((a) => a.username === username)) {
     return { ok: false, error: "That username is already taken on this phone." };
+  }
+  if (accounts.some((a) => a.phone && a.phone === phone)) {
+    return { ok: false, error: "That mobile number is already used on this phone." };
   }
 
   const salt = randomSalt();
   const account: LocalAccount = {
     username,
     salt,
-    passwordHash: hashPassword(password, salt),
-    displayName: (displayName ?? "").trim() || username,
+    passwordHash: hashPassword(input.password, salt),
+    displayName: (input.displayName ?? "").trim() || username,
+    phone,
+    address,
     createdAt: new Date().toISOString(),
   };
   await writeAccounts([...accounts, account]);
@@ -129,22 +176,29 @@ export async function createAccount(
   return { ok: true, account };
 }
 
+/** Sign in with username or mobile number + password. */
 export async function signIn(
-  usernameRaw: string,
+  loginRaw: string,
   password: string
 ): Promise<{ ok: true; account: LocalAccount } | { ok: false; error: string }> {
-  const username = normalizeUsername(usernameRaw);
-  if (!username || !password) {
-    return { ok: false, error: "Enter your username and password." };
+  const login = loginRaw.trim();
+  if (!login || !password) {
+    return { ok: false, error: "Enter mobile / username and password." };
   }
   const accounts = await readAccounts();
-  const account = accounts.find((a) => a.username === username);
-  if (!account) return { ok: false, error: "No account with that username on this phone." };
+  const asPhone = normalizePhone(login);
+  const asUser = normalizeUsername(login);
+  const account =
+    accounts.find((a) => a.phone && a.phone === asPhone) ??
+    accounts.find((a) => a.username === asUser);
+  if (!account) {
+    return { ok: false, error: "No profile with that mobile or username." };
+  }
   const hash = hashPassword(password, account.salt);
   if (hash !== account.passwordHash) {
     return { ok: false, error: "Wrong password." };
   }
-  await setSession({ username });
+  await setSession({ username: account.username });
   return { ok: true, account };
 }
 
@@ -155,17 +209,89 @@ export async function getAccount(
   return accounts.find((a) => a.username === username) ?? null;
 }
 
+/** Find local profile by phone (for Circle matching on this device only). */
+export async function findAccountByPhone(
+  phoneRaw: string
+): Promise<LocalAccount | null> {
+  const phone = normalizePhone(phoneRaw);
+  if (phone.length !== 10) return null;
+  const accounts = await readAccounts();
+  return accounts.find((a) => a.phone === phone) ?? null;
+}
+
+export async function updateProfileFields(
+  username: string,
+  patch: { displayName?: string; phone?: string; address?: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const accounts = await readAccounts();
+  const idx = accounts.findIndex((a) => a.username === username);
+  if (idx < 0) return { ok: false, error: "Profile not found." };
+  const cur = accounts[idx]!;
+  let phone = cur.phone;
+  let address = cur.address;
+  if (patch.phone !== undefined) {
+    const err = validatePhone(patch.phone);
+    if (err) return { ok: false, error: err };
+    phone = normalizePhone(patch.phone);
+    if (accounts.some((a, i) => i !== idx && a.phone === phone)) {
+      return { ok: false, error: "That mobile is already used on this phone." };
+    }
+  }
+  if (patch.address !== undefined) {
+    const err = validateAddress(patch.address);
+    if (err) return { ok: false, error: err };
+    address = patch.address.trim();
+  }
+  const next = [...accounts];
+  next[idx] = {
+    ...cur,
+    displayName:
+      patch.displayName !== undefined
+        ? patch.displayName.trim() || cur.username
+        : cur.displayName,
+    phone,
+    address,
+  };
+  await writeAccounts(next);
+  return { ok: true };
+}
+
+/** Rename local username (same phone session). Public alerts never use this. */
+export async function renameUsername(
+  currentUsername: string,
+  nextUsernameRaw: string
+): Promise<{ ok: true; account: LocalAccount } | { ok: false; error: string }> {
+  const userErr = validateUsername(nextUsernameRaw);
+  if (userErr) return { ok: false, error: userErr };
+  const nextName = normalizeUsername(nextUsernameRaw);
+  const accounts = await readAccounts();
+  const idx = accounts.findIndex((a) => a.username === currentUsername);
+  if (idx < 0) return { ok: false, error: "Profile not found." };
+  if (
+    nextName !== currentUsername &&
+    accounts.some((a) => a.username === nextName)
+  ) {
+    return { ok: false, error: "That username is already taken on this phone." };
+  }
+  const cur = accounts[idx]!;
+  const updated: LocalAccount = {
+    ...cur,
+    username: nextName,
+    displayName:
+      cur.displayName === cur.username ? nextName : cur.displayName,
+  };
+  const next = [...accounts];
+  next[idx] = updated;
+  await writeAccounts(next);
+  await setSession({ username: nextName });
+  return { ok: true, account: updated };
+}
+
 export async function updateDisplayName(
   username: string,
   displayName: string
 ): Promise<void> {
-  const accounts = await readAccounts();
-  const next = accounts.map((a) =>
-    a.username === username
-      ? { ...a, displayName: displayName.trim() || a.username }
-      : a
-  );
-  await writeAccounts(next);
+  await updateProfileFields(username, { displayName });
 }
 
 export async function signOut(): Promise<void> {

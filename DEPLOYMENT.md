@@ -1,292 +1,318 @@
 # CivicLeder — Deployment Guide
 
-Citizen guide for Delhi (Expo / React Native). This document covers the tech stack, packages, tools, production changes, and how to ship the app, website, and Supabase backend.
+Production guide for shipping CivicLeder: mobile app, independent API, MySQL, and marketing website.
 
 Repository: https://github.com/theatharv1/CivicLeder
 
 ---
 
-## 1. Tech stack
+## 1. Architecture
+
+```
+Expo / React Native (CivicLeder)
+            │
+            │  HTTPS  EXPO_PUBLIC_API_URL
+            ▼
+   server/  (Node.js + Express + TypeScript + Prisma)
+            │
+            ├── MySQL 8
+            └── Local file storage (uploads/report-evidence/)
+
+website/  → static host (marketing + privacy policy)
+```
+
+Supabase is **not** used at runtime. Legacy Postgres SQL under `backend/` is reference-only.
+
+---
+
+## 2. Tech stack
 
 | Layer | Technology |
 | --- | --- |
-| Mobile app | Expo ~57, React Native 0.86, React 19, TypeScript |
-| Navigation | React Navigation (native stack + custom tab bar) |
-| Local data | AsyncStorage 2.2.0 (alerts, tips, cases, local profile) |
-| Cloud data (optional) | Supabase (Postgres + Storage) via `@supabase/supabase-js` |
-| Icons | lucide-react-native |
-| Device APIs | expo-location, expo-image-picker, expo-clipboard, expo-file-system |
-| Marketing site | Static HTML/CSS in `website/` |
-| Native builds | EAS Build (`eas.json`) — Android AAB/APK |
-| Source control | GitHub |
+| Mobile | Expo ~57, React Native 0.86, React 19, TypeScript |
+| Navigation | React Navigation (native stack + custom tabs) |
+| On-device data | AsyncStorage 2.2.0 (alerts, local tips/cases, guest profile) |
+| API | Node.js, Express, TypeScript, Zod |
+| ORM / DB | Prisma → **MySQL 8** |
+| Evidence files | Local filesystem via storage abstraction (`server/uploads/`) |
+| Website | Static HTML/CSS in `website/` |
+| Store builds | EAS Build (`eas.json`) |
+| Source | GitHub |
 
 **App identity**
 
-- Display name: CivicLeder  
-- Slug: `civicleader`  
-- iOS bundle id: `com.civicleader.app`  
-- Android package: `com.civicleader.app`  
-- URL scheme: `civicleader`  
-- Support contact (copy): `hello@civicleader.app`
-
----
-
-## 2. Repository layout
-
-| Path | What it is |
+| Item | Value |
 | --- | --- |
-| `/` (`App.tsx`, `src/`, `assets/`) | Mobile app |
-| `backend/` | Supabase SQL, migrations, verification notes |
-| `website/` | Public site + privacy policy |
-| `app.json` | Expo config (icons, permissions, bundle ids) |
-| `eas.json` | EAS build / submit profiles |
-| `.env` | Local secrets only — **never commit** |
+| Display name | CivicLeder |
+| Slug | `civicleader` |
+| iOS bundle id | `com.civicleader.app` |
+| Android package | `com.civicleader.app` |
+| URL scheme | `civicleader` |
+| Support email (copy) | `civicleder@gmail.com` |
 
 ---
 
-## 3. Packages
+## 3. Repository layout
 
-From `package.json`:
-
-### Runtime
-
-- `expo` (~57)
-- `react` (19.2.x), `react-native` (0.86.x)
-- `@react-navigation/native`, `@react-navigation/native-stack`
-- `@react-native-async-storage/async-storage` **2.2.0** (required for Expo Go compatibility)
-- `@supabase/supabase-js`, `react-native-url-polyfill`
-- `expo-clipboard`, `expo-file-system`, `expo-image-picker`, `expo-location`, `expo-status-bar`
-- `react-native-gesture-handler`, `react-native-safe-area-context`, `react-native-screens`, `react-native-svg`
-- `lucide-react-native`
-
-### Dev
-
-- `typescript`, `@types/react`
-
-### Scripts
-
-```bash
-npm start          # Expo Go / Metro (port 8081)
-npm run android    # expo run:android
-npm run ios        # Expo Go on iOS
-npm run web        # Expo web (optional; marketing site is website/)
-```
-
----
-
-## 4. Tools to install
-
-| Tool | Why |
+| Path | Role in production |
 | --- | --- |
-| Node.js 20+ and npm | Install deps, run Metro |
-| Git | Source control |
-| Expo (`npx expo`) | Local development |
-| EAS CLI (`npm i -g eas-cli`) | Production Android/iOS builds |
-| Expo / EAS account | Linked to the project for builds |
-| Supabase project | Cloud DB + Storage for guides/reports |
-| Google Play Console | Android store release |
-| Apple Developer + App Store Connect | iOS store release (when ready) |
-| Static host (Vercel, Netlify, GitHub Pages, etc.) | Deploy `website/` |
+| `App.tsx`, `src/`, `assets/` | Mobile app |
+| `server/` | **Runtime** API (deploy this) |
+| `backend/` | Legacy Supabase/Postgres SQL — **do not** paste into MySQL as-is |
+| `website/` | Public site + `privacy.html` |
+| `app.json` | Expo name, icons, permissions, bundle ids |
+| `eas.json` | Android/iOS build & submit profiles |
+| `.env` / `server/.env` | Secrets — **never commit** |
+| `DEPLOYMENT.md` | This guide |
+| `MIGRATION_REPORT.md` | Supabase → MySQL migration notes |
 
-Optional local website preview:
+---
 
-```bash
-npx serve website
-```
+## 4. Packages and tools
+
+### Mobile (`package.json`)
+
+**Runtime:** `expo`, `react`, `react-native`, `@react-navigation/native`, `@react-navigation/native-stack`, `@react-native-async-storage/async-storage@2.2.0`, `expo-clipboard`, `expo-file-system`, `expo-image-picker`, `expo-location`, `expo-status-bar`, `lucide-react-native`, `react-native-gesture-handler`, `react-native-safe-area-context`, `react-native-screens`, `react-native-svg`, `react-native-url-polyfill`
+
+**Dev:** `typescript`, `@types/react`
+
+**Scripts:** `npm start` · `npm run android` · `npm run ios`
+
+### API (`server/package.json`)
+
+**Runtime:** `express`, `cors`, `helmet`, `morgan`, `zod`, `multer`, `@prisma/client`, `dotenv`, `uuid`
+
+**Dev:** `typescript`, `tsx`, `prisma`, `@types/*`
+
+**Scripts:** `npm run dev` · `npm run build` · `npm start` · `npm run db:migrate` · `npm run db:seed`
+
+### Tools to install
+
+| Tool | Purpose |
+| --- | --- |
+| Node.js 20+ | App + API |
+| MySQL 8 | Production database |
+| Git | Source |
+| EAS CLI (`npm i -g eas-cli`) | Store builds |
+| Expo account | Linked to EAS project |
+| Google Play Console | Android release |
+| Apple Developer (optional) | iOS release |
+| Static host | Vercel / Netlify / nginx for `website/` |
+| Process manager | `systemd`, PM2, or Docker for `server/` |
 
 ---
 
 ## 5. Where data lives
 
-### On the phone (AsyncStorage)
-
-Always used, even without Supabase:
-
-- Public alerts and “I see this too” votes  
-- Community tips / tip votes (offline fallback)  
-- My Cases personal notes  
-- Anonymous device id  
-- Optional username + password profile (password stored hashed, local only)
-
-**Delete my data** (About screen) clears these keys on that device.
-
-### In Supabase (when env is set)
-
-- Civic guides, contacts, routing tables  
-- Report / case rows (`reports`, `official_complaints`, …)  
-- Evidence files in private bucket `report-evidence`
-
-### Important product limits today
-
-| Feature | Production meaning |
+| Data | Where |
 | --- | --- |
-| Public alerts | **Device-local only** — not a shared city feed until you add a cloud table |
-| Username / password | **On-device only** — not Supabase Auth; does not sync across phones |
-| GitHub | Source code only — no user data |
+| Public alerts, tip votes (local), My Cases notes, guest profile, device id | Phone (AsyncStorage) |
+| Guides, contacts, routing, cloud tips, reports, complaints | MySQL via API |
+| Evidence files | Server disk under `STORAGE_PATH/report-evidence/` |
+| Source code | GitHub only — no user secrets |
+
+**Delete my data** (About screen) clears on-device storage only. Cloud rows for that device are not auto-wiped until you add that API.
+
+**Offline:** If `EXPO_PUBLIC_API_URL` is missing or the API fails, the app keeps using in-app fallbacks.
 
 ---
 
-## 6. Production changes you must make
+## 6. Production environment variables
 
-## Backend (production)
-
-Use the independent API in `server/` with MySQL — see `server/README.md`.
-
-Mobile env (only):
+### Mobile (root `.env` or EAS secrets)
 
 ```bash
-EXPO_PUBLIC_API_URL=https://your-api.example.com/api/v1
+EXPO_PUBLIC_API_URL=https://api.YOUR_DOMAIN.com/api/v1
 ```
 
-Do **not** put MySQL credentials or storage secrets in the mobile app.
+Only this value is required in the app. Never put MySQL passwords or storage credentials in the mobile binary.
 
-Legacy `backend/*.sql` files are historical Supabase/Postgres reference only.
+### API (`server/.env`)
 
-### 6.2 Supabase (production project)
+```bash
+PORT=3000
+NODE_ENV=production
 
-Prefer a **dedicated production** project (not the same as casual/dev).
+DATABASE_URL="mysql://USER:STRONG_PASSWORD@DB_HOST:3306/civicleader"
 
-1. Open Supabase Dashboard → SQL Editor.  
-2. Apply SQL in the order documented in `backend/APPLY_INSTRUCTIONS.md`.  
-   Typical starting point for a fresh project:
-   - `backend/APPLY_ALL_CIVIC.sql`
-   - then migrations under `backend/migrations/` (filing assistant, fire safety URL, authority registry, category completes, community contributions, etc.)  
-3. Create Storage bucket **`report-evidence`** (private).  
-4. Add Storage policies for anon upload/read as described in `backend/STORAGE_REPORT_EVIDENCE.md`.  
-5. Before wide launch, review **RLS** and tighten anon policies.  
-6. Re-check seeded contacts against verification notes in `backend/`.
+STORAGE_DRIVER=local
+STORAGE_PATH=/var/civicleader/uploads
 
-Repair scripts (`FIX_*.sql`, diagnostics) exist if a past partial apply left the schema inconsistent — see `APPLY_INSTRUCTIONS.md`.
+CORS_ORIGINS=https://civicleader.app,https://www.civicleader.app
+```
 
-### 6.3 App / store identity
+Rules:
 
-Update before each public release:
+- Use a strong DB password; restrict DB network access.
+- Do not use `CORS_ORIGINS=*` in production.
+- Keep `STORAGE_PATH` outside any public web root.
+- Never commit `.env`.
 
-| Item | Current / note | Action |
-| --- | --- | --- |
-| `expo.version` in `app.json` | `1.0.0` | Bump for each store release |
-| Android `versionCode` | `1` | Increment on every Play upload |
-| Support email | `hello@civicleader.app` | Use an inbox you control |
-| Privacy policy URL | `website/privacy.html` | Host it; paste the **live HTTPS URL** into Play / App Store |
-| Store listing copy | — | State clearly: guide only, not a government filing app |
-| Permissions (camera, photos, location) | Declared in `app.json` plugins | Keep store privacy answers aligned with real use |
-
-Android signing: use a release keystore (EAS can manage credentials). Keystores and `credentials.json` are gitignored — do not commit them.
-
-### 6.4 Website
-
-1. Deploy the contents of `website/` as static files.  
-2. Point your domain (e.g. `civicleader.app`) at that host.  
-3. Confirm:
-   - `https://your-domain/` → home  
-   - `https://your-domain/privacy.html` → privacy  
-4. When store builds exist, add real download links on the home page.  
-5. Keep privacy contact email accurate.
-
-Example (Vercel): create a project with **Root Directory** = `website`, framework = Other / static, then deploy.
-
-### 6.5 Security and product decisions before scale
-
-| Topic | Recommended production change |
-| --- | --- |
-| Shared public alerts | Add a Supabase table + RLS; update `src/lib/publicAlerts.ts` so posts sync across users |
-| Real accounts | Replace local auth (`src/lib/localAuth.ts`) with Supabase Auth |
-| Delete my data | Also delete that user’s cloud rows when cloud identity exists |
-| Distribution | Ship store / APK builds; do not rely on Expo Go for end users |
+Templates: `.env.example`, `server/.env.example`.
 
 ---
 
-## 7. Deploy step by step
+## 7. Production changes before go-live
 
-### 7.1 Local development check
+### 7.1 MySQL
 
-```bash
-git clone https://github.com/theatharv1/CivicLeder.git
-cd CivicLeder
-npm install
-# create .env with EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-npm start
+```sql
+CREATE DATABASE civicleader CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'civicleader'@'%' IDENTIFIED BY 'STRONG_PASSWORD';
+GRANT ALL ON civicleader.* TO 'civicleader'@'%';
+FLUSH PRIVILEGES;
 ```
 
-Website preview:
+Then on the API host:
 
 ```bash
-npx serve website
+cd server
+cp .env.example .env   # edit for production
+npm ci
+npx prisma generate
+npx prisma migrate deploy
+npm run db:seed
+npm run build
+NODE_ENV=production node dist/server.js
 ```
 
-### 7.2 Backend (once per environment)
+Confirm: `GET https://api.YOUR_DOMAIN.com/health` → `{ "status": "ok" }`.
 
-1. Create / open production Supabase project.  
-2. Run SQL per `backend/APPLY_INSTRUCTIONS.md`.  
-3. Create `report-evidence` bucket + policies (`backend/STORAGE_REPORT_EVIDENCE.md`).  
-4. Copy project URL + anon key into app env / EAS.
+Import remaining catalog rows from legacy SQL / seed later if needed (see `server/docs/MIGRATION_FROM_SUPABASE.md`). Offline fallbacks cover gaps until then.
+
+### 7.2 API hosting
+
+- Terminate TLS (nginx, Caddy, cloud load balancer).
+- Reverse-proxy to `PORT` (e.g. 3000).
+- Run under systemd/PM2; restart on crash.
+- Disk space for `STORAGE_PATH`; backups for MySQL + uploads.
+- Firewall: only 443 public; MySQL not public if avoidable.
 
 ### 7.3 Website
 
-Deploy `website/` to your static host and verify privacy URL over HTTPS.
+1. Deploy `website/` as static files.
+2. Point domain (e.g. `civicleader.app`) at the host.
+3. Verify `https://YOUR_DOMAIN/privacy.html`.
+4. Use that privacy URL in Play / App Store listings.
+5. Add real store download links when builds are live.
+6. Ensure `civicleder@gmail.com` works.
 
-### 7.4 Android (EAS)
+### 7.4 App / store
 
-`eas.json` profiles:
+| Item | Action |
+| --- | --- |
+| `expo.version` in `app.json` | Bump each release |
+| Android `versionCode` | Increment every Play upload |
+| EAS env | Set production `EXPO_PUBLIC_API_URL` |
+| Privacy URL | Live HTTPS policy page |
+| Listing copy | Guide only — not a government filing app |
+| Signing | EAS-managed or release keystore (never commit) |
+| Permissions | Match camera / photos / location copy in stores |
 
-| Profile | Output | Use |
+### 7.5 Product limits to decide before scale
+
+| Topic | Current behavior | Production decision |
 | --- | --- | --- |
-| `development` | Internal APK + dev client | Internal testing |
-| `preview` | Internal APK | Stakeholder testing |
-| `production` | App Bundle (AAB) | Play Store |
-| `submit.production` | Play track `internal`, status `draft` | First uploads |
+| Public alerts | Device-local only | Keep, or add shared MySQL feed |
+| Username / password | On-device only | Keep, or add real server auth |
+| Delete my data | Phone only | Also delete server rows if accounts exist |
+
+---
+
+## 8. Deploy steps
+
+### A. API + MySQL
+
+1. Provision MySQL 8 and create DB/user.
+2. Deploy `server/` code to the API host.
+3. Set production `server/.env`.
+4. `npm ci && npx prisma generate && npx prisma migrate deploy && npm run db:seed && npm run build`
+5. Start process; check `/health`.
+6. Put HTTPS in front of the API.
+
+### B. Website
+
+Deploy `website/` to static hosting; confirm privacy URL.
+
+### C. Android (EAS)
 
 ```bash
 npm i -g eas-cli
 eas login
 cd /path/to/CivicLeder
-eas build:configure    # once, if project not linked
+# Ensure EXPO_PUBLIC_API_URL is set for production builds
 eas build --platform android --profile production
 eas submit --platform android --profile production
 ```
 
-### 7.5 iOS (when ready)
+| Profile | Output | Use |
+| --- | --- | --- |
+| `development` | Dev client APK | Internal |
+| `preview` | Internal APK | QA |
+| `production` | Play App Bundle (AAB) | Store |
+| Submit `production` | Play track `internal`, draft | First uploads |
+
+### D. iOS (when ready)
 
 ```bash
 eas build --platform ios --profile production
 eas submit --platform ios
 ```
 
-Requires Apple Developer Program, App Store Connect app record for `com.civicleader.app`, and privacy answers matching the live privacy policy.
+Needs Apple Developer Program and App Store Connect for `com.civicleader.app`.
 
 ---
 
-## 8. Pre-launch checklist
+## 9. Local development (quick)
 
-- [ ] Production Supabase project created  
-- [ ] SQL applied successfully (no red errors)  
-- [ ] `report-evidence` bucket exists and policies work from a test device  
-- [ ] `EXPO_PUBLIC_SUPABASE_*` set for EAS production builds  
-- [ ] `website/` live with working privacy page  
-- [ ] Play / App Store privacy URL points to that page  
-- [ ] Version / `versionCode` bumped  
-- [ ] Release signing credentials configured in EAS  
-- [ ] Listing copy: “not a government department; does not file for you”  
-- [ ] Decision documented: keep alerts local **or** ship shared cloud alerts  
-- [ ] Decision documented: keep local profiles **or** move to Supabase Auth  
-- [ ] `.env`, keystores, and service-role keys are **not** in git  
+```bash
+# API
+cd server && cp .env.example .env && npm install
+npx prisma db push && npm run db:seed && npm run dev
+
+# App (another terminal)
+cd .. && cp .env.example .env
+# EXPO_PUBLIC_API_URL=http://localhost:3000/api/v1
+# On a phone use http://YOUR_LAN_IP:3000/api/v1
+npm install && npm start
+
+# Website preview
+npx serve website
+```
 
 ---
 
-## 9. Quick reference — operator files
+## 10. Pre-launch checklist
 
-| File | Purpose |
+- [ ] MySQL production DB created and reachable only by API
+- [ ] `prisma migrate deploy` + `db:seed` succeeded
+- [ ] `GET /health` returns ok over HTTPS
+- [ ] Evidence upload works; files land under `STORAGE_PATH`
+- [ ] `EXPO_PUBLIC_API_URL` set for EAS production
+- [ ] Website live; privacy URL works
+- [ ] Play / App Store privacy field uses that URL
+- [ ] Version / `versionCode` bumped
+- [ ] Release signing configured
+- [ ] Listing states: not a government department; does not file for you
+- [ ] CORS origins locked down
+- [ ] No `.env`, keystores, or DB passwords in git
+- [ ] Backups scheduled for MySQL + uploads
+
+---
+
+## 11. Operator docs
+
+| Doc | Contents |
 | --- | --- |
-| `README.md` | Project overview and local run |
-| `DEPLOYMENT.md` | This guide |
-| `backend/APPLY_INSTRUCTIONS.md` | Exact SQL apply order and repairs |
-| `backend/STORAGE_REPORT_EVIDENCE.md` | Evidence bucket setup |
-| `app.json` | Expo app metadata and permissions |
-| `eas.json` | Build and submit profiles |
-| `website/privacy.html` | Privacy policy for stores and users |
+| `server/README.md` | API install, scripts, storage |
+| `server/docs/API.md` | Endpoint reference |
+| `server/docs/DATABASE.md` | Tables and business rules |
+| `server/docs/MIGRATION_FROM_SUPABASE.md` | Postgres → MySQL notes |
+| `MIGRATION_REPORT.md` | What changed in the migration |
+| `backend/APPLY_INSTRUCTIONS.md` | Legacy SQL only (reference) |
 
 ---
 
-## 10. Support
+## 12. Support
 
-Privacy / product contact (as stated in the site): [hello@civicleader.app](mailto:hello@civicleader.app)
+Privacy / product contact (as on the site): [civicleder@gmail.com](mailto:civicleder@gmail.com)

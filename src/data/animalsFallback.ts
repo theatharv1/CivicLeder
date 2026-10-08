@@ -1,5 +1,6 @@
 import type { IssueTypeRow } from "./emergencyFallback";
 import type { RoutedAuthority } from "./routingFallback";
+import { MCD311_CREATE, MCD311_TRACK } from "./mcd311Urls";
 
 export const FALLBACK_ANIMALS_ISSUE_TYPES: IssueTypeRow[] = [
   {
@@ -67,10 +68,11 @@ export const FALLBACK_ANIMALS_ROUTING: RoutedAuthority[] = [
       },
       {
         channel_type: "website",
-        label: "MCD Online",
+        label: "MCD Online / MCD311",
         value: "https://mcdonline.nic.in/",
-        action_url: "https://mcdonline.nic.in/",
-        purpose: "info",
+        action_url: MCD311_CREATE,
+        tracking_url: MCD311_TRACK,
+        purpose: "civic_complaint",
         priority: 3,
       },
     ],

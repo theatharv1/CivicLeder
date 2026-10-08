@@ -1,23 +1,16 @@
-import { Alert, Linking, Platform } from "react-native";
+import { Alert, Linking } from "react-native";
 
-/** Dial an emergency number safely (simulators/web often cannot open tel:). */
+/**
+ * Open the phone dialer with the number filled in.
+ *
+ * We call openURL directly instead of checking canOpenURL first: on Android 11+
+ * canOpenURL("tel:") returns false unless the manifest declares a <queries>
+ * entry, which would block every emergency button. openURL itself works.
+ */
 export async function dialNumber(number: string, label?: string): Promise<void> {
-  const url = Platform.select({
-    ios: `telprompt:${number}`,
-    default: `tel:${number}`,
-  }) as string;
-
+  const digits = number.replace(/[^\d+]/g, "");
   try {
-    const can = await Linking.canOpenURL(url);
-    if (!can) {
-      Alert.alert(
-        label ? `Call ${label}` : "Call",
-        `This device cannot place calls. Dial ${number} from your phone.`,
-        [{ text: "OK" }]
-      );
-      return;
-    }
-    await Linking.openURL(url);
+    await Linking.openURL(`tel:${digits}`);
   } catch {
     Alert.alert(
       label ? `Call ${label}` : "Call",

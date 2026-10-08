@@ -2,7 +2,7 @@
   "expo": {
     "name": "CivicLeder",
     "slug": "civicleader",
-    "version": "1.0.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "civicleader",
@@ -20,32 +20,75 @@
     },
     "android": {
       "package": "com.civicleader.app",
-      "versionCode": 1,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
+      ]
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 320,
+          "resizeMode": "contain"
+        }
+      ],
+      [
         "expo-image-picker",
         {
-          "photosPermission": "CivicLeder needs photos only to attach to your personal draft notes.",
-          "cameraPermission": "CivicLeder needs the camera only to attach photos to your draft.",
-          "microphonePermission": "CivicLeder needs the microphone only if you record a short video for your draft."
+          "photosPermission": "CivicLeder uses photos only when you attach one to a report or public alert.",
+          "cameraPermission": "CivicLeder uses the camera only when you take a photo for a report or public alert.",
+          "microphonePermission": "CivicLeder uses the microphone only if you record a short video for your report."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "CivicLeder uses your location to suggest where the problem is, for your draft only."
+          "locationWhenInUsePermission": "CivicLeder uses your location to show public alerts near you and to attach the place to an alert or report.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "buildArchs": [
+              "arm64-v8a"
+            ],
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "useLegacyPackaging": true,
+            "enableBundleCompression": true
+          }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "280006d5-dba7-46e2-8ea0-8cceebbea77b"
+      }
+    },
+    "owner": "theatharvshrivastava"
   }
 }

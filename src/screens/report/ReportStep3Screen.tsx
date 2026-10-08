@@ -152,14 +152,8 @@ export default function ReportStep3Screen({ navigation }: Props) {
     }
   };
 
-  /** Next: photos (optional). Do not jump to contact. */
+  /** Photos + place steps removed — go to office suggestion. */
   const onContinue = () => {
-    if (!canContinue) return;
-    navigation.navigate("ReportStep4");
-  };
-
-  /** Skip optional photos + place - go to who can help. */
-  const onSkipPrep = () => {
     if (!canContinue) return;
     navigation.navigate("ReportStep6");
   };
@@ -204,30 +198,13 @@ export default function ReportStep3Screen({ navigation }: Props) {
 
         <Text style={styles.heading}>Is anyone in danger right now?</Text>
         <Text style={styles.sub}>
-          {usesJurisdictionHints
-            ? isAnimals
-              ? "Attack happening now - call 112. Keep distance. Do not try to catch animals yourself."
-              : isEnvironment
-              ? "Chemical spill, fire, falling tree, or wildlife danger - call 112 / 101 first."
-              : isRoadsPublic
-              ? "Road collapse, open manhole in traffic, live wire, or flood hazard - call 112 / 101. Stay out of traffic."
-              : isWasteGarbage
-              ? "Active fire or people in danger near smoke - call 112 / 101. Do not approach."
-              : isWaterDrainage
-              ? "Flooding, people trapped, open manhole under water, or water near electricity - call 112 / 101 / 102. Do not enter floodwater."
-              : isElectricity
-                ? "Live wire, fire, or electrocution risk - call 112 / 101. Do not approach wires."
-                : isConstruction
-                  ? "Fire, collapse, people trapped, or falling material - call 112 / 101. Do not enter the site."
-                  : "Collapse, people trapped, or immediate danger - call 112 / 101 first."
-            : "If life is at risk, call 112 or 101 now. Otherwise continue preparing your guide."}
+          Life at risk? Call 112 / 101 first. Otherwise continue.
         </Text>
 
         <View style={styles.warnCard}>
           <AlertTriangle size={22} color={colors.white} strokeWidth={2.4} />
           <Text style={styles.warnText}>
-            If there is an immediate threat to life, health or property, please
-            call the emergency number directly.
+            Immediate threat? Call emergency now — tap a number below.
           </Text>
         </View>
 
@@ -461,22 +438,7 @@ export default function ReportStep3Screen({ navigation }: Props) {
                 !canContinue && styles.continueTextDisabled,
               ]}
             >
-              Next: photos (optional) →
-            </Text>
-          </Pressable>
-          <Pressable
-            disabled={!canContinue}
-            onPress={onSkipPrep}
-            style={{ marginTop: 10, alignItems: "center", paddingVertical: 8 }}
-          >
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color: canContinue ? colors.linkBlue : colors.muted,
-              }}
-            >
-              Skip photos & place - who can help
+              Next: office →
             </Text>
           </Pressable>
         </View>

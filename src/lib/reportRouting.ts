@@ -12,7 +12,10 @@ import { FALLBACK_WATER_DRAINAGE_ROUTING } from "../data/waterDrainageFallback";
 import { FALLBACK_WASTE_GARBAGE_ROUTING } from "../data/wasteGarbageFallback";
 import { FALLBACK_ROADS_PUBLIC_SPACES_ROUTING } from "../data/roadsPublicSpacesFallback";
 import { FALLBACK_ENVIRONMENT_ROUTING } from "../data/environmentFallback";
+import { FALLBACK_WOMEN_SAFETY_ROUTING } from "../data/womenSafetyFallback";
+import { FALLBACK_POLICE_HELP_ROUTING } from "../data/policeHelpFallback";
 import { api, apiConfigured } from "./apiClient";
+import { normalizeTrackingUrl } from "./trackingUrls";
 
 /** Map app category ids to DB slugs where they differ. */
 function dbCategorySlug(categorySlug: string): string[] {
@@ -37,6 +40,12 @@ function offlineFallback(categorySlug: string): RoutedAuthority[] {
   }
   if (categorySlug === "animals") {
     return FALLBACK_ANIMALS_ROUTING;
+  }
+  if (categorySlug === "women_safety") {
+    return FALLBACK_WOMEN_SAFETY_ROUTING;
+  }
+  if (categorySlug === "police_help") {
+    return FALLBACK_POLICE_HELP_ROUTING;
   }
   return [];
 }
@@ -97,7 +106,8 @@ export function channelTrackingUrl(
   channels: AuthorityChannel[]
 ): string | null {
   const withTrack = channels.find((c) => Boolean(c.tracking_url));
-  return withTrack?.tracking_url ?? null;
+  const raw = withTrack?.tracking_url ?? null;
+  return normalizeTrackingUrl(raw);
 }
 
 export function channelPhone(channels: AuthorityChannel[]): string | null {

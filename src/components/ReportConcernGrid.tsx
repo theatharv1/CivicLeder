@@ -3,17 +3,20 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   Building2,
   CircleEllipsis,
-  Construction,
   Droplets,
   Flame,
-  Route,
+  Phone,
   Trash2,
+  Venus,
   Zap,
 } from "lucide-react-native";
 import type { ReportCategoryId } from "../data/reportCategories";
 import { colors, radii, space } from "../theme/tokens";
 
-/** Home shortcuts → Report category IDs (`null` = open Step 1 with none selected). */
+/**
+ * Home shortcuts. Essential numbers first; Women safety near More.
+ * "More" / "All categories" → full list. Report tab is separate (file / track).
+ */
 const HOME_REPORT_CATEGORIES: {
   key: string;
   categoryId: ReportCategoryId | null;
@@ -21,6 +24,13 @@ const HOME_REPORT_CATEGORIES: {
   Icon: typeof Building2;
   color: string;
 }[] = [
+  {
+    key: "numbers",
+    categoryId: null,
+    label: "Essential\nNumbers",
+    Icon: Phone,
+    color: colors.primaryBlue,
+  },
   {
     key: "building",
     categoryId: "building",
@@ -31,16 +41,9 @@ const HOME_REPORT_CATEGORIES: {
   {
     key: "fire_safety",
     categoryId: "fire_safety",
-    label: "Fire Safety",
+    label: "Fire",
     Icon: Flame,
     color: colors.fire,
-  },
-  {
-    key: "construction",
-    categoryId: "construction",
-    label: "Construction",
-    Icon: Construction,
-    color: colors.construction,
   },
   {
     key: "electricity",
@@ -52,23 +55,23 @@ const HOME_REPORT_CATEGORIES: {
   {
     key: "water_drainage",
     categoryId: "water_drainage",
-    label: "Water &\nDrainage",
+    label: "Water",
     Icon: Droplets,
     color: colors.water,
   },
   {
     key: "waste_garbage",
     categoryId: "waste_garbage",
-    label: "Waste &\nGarbage",
+    label: "Waste",
     Icon: Trash2,
     color: colors.waste,
   },
   {
-    key: "roads_public",
-    categoryId: "roads_public",
-    label: "Roads &\nPublic Spaces",
-    Icon: Route,
-    color: colors.roads,
+    key: "women_safety",
+    categoryId: "women_safety",
+    label: "Women\nSafety",
+    Icon: Venus,
+    color: colors.emergency,
   },
   {
     key: "more",
@@ -82,15 +85,20 @@ const HOME_REPORT_CATEGORIES: {
 type Props = {
   onSeeAll?: () => void;
   onSelect?: (categoryId: ReportCategoryId | null) => void;
+  onOpenEssentialNumbers?: () => void;
 };
 
-export default function ReportConcernGrid({ onSeeAll, onSelect }: Props) {
+export default function ReportConcernGrid({
+  onSeeAll,
+  onSelect,
+  onOpenEssentialNumbers,
+}: Props) {
   return (
     <View>
       <View style={styles.header}>
         <Text style={styles.heading}>Report a Concern</Text>
         <Pressable onPress={onSeeAll} hitSlop={8}>
-          <Text style={styles.seeAll}>See All →</Text>
+          <Text style={styles.seeAll}>All categories →</Text>
         </Pressable>
       </View>
       <View style={styles.grid}>
@@ -98,7 +106,17 @@ export default function ReportConcernGrid({ onSeeAll, onSelect }: Props) {
           <Pressable
             key={item.key}
             style={styles.tile}
-            onPress={() => onSelect?.(item.categoryId)}
+            onPress={() => {
+              if (item.key === "numbers") {
+                onOpenEssentialNumbers?.();
+                return;
+              }
+              if (item.key === "more") {
+                onSeeAll?.();
+                return;
+              }
+              onSelect?.(item.categoryId);
+            }}
           >
             <item.Icon size={26} color={item.color} strokeWidth={2.1} />
             <Text style={styles.tileLabel}>{item.label}</Text>

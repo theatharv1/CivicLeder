@@ -11,35 +11,38 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
+  ArrowLeft,
   Bell,
   ChevronRight,
   CircleHelp,
   FileText,
   Info,
-  Languages,
   LogOut,
-  Settings,
-  User,
+  Pencil,
+  Phone,
+  UserRound,
 } from "lucide-react-native";
-import { useI18n } from "../Context/I18nContext";
 import { useProfile } from "../Context/ProfileContext";
-import { APP_NAME } from "../lib/brand";
+import { requireAccount } from "../lib/requireAccount";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, radii, space } from "../theme/tokens";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-export default function ProfileScreen() {
+export default function ProfileScreen({
+  onBackHome,
+}: {
+  onBackHome?: () => void;
+}) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
-  const { t, lang } = useI18n();
   const { profile, loggedIn, logOut, isGuest } = useProfile();
 
-  const onLogout = () => {
-    Alert.alert(`Switch to guest?`, `You will stay signed out of ${APP_NAME} until you sign in again. Your account stays on this phone.`, [
+  const onSignOut = () => {
+    Alert.alert("Sign out?", "You can sign in again anytime on this phone.", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Use as guest",
+        text: "Sign out",
         style: "destructive",
         onPress: () => {
           void logOut();
@@ -51,95 +54,119 @@ export default function ProfileScreen() {
   const rows = [
     {
       key: "reports",
-      title: t.myReports,
-      sub: t.myReportsSub,
+      title: "My Cases",
+      sub: "Tracking IDs",
       Icon: FileText,
-      onPress: () => navigation.navigate("Main", { screen: "cases" }),
+      tint: colors.primaryBlue,
+      onPress: () => {
+        if (
+          !requireAccount(navigation, "Profile needed for My Cases.", loggedIn)
+        )
+          return;
+        navigation.navigate("MyCases");
+      },
+    },
+    {
+      key: "numbers",
+      title: "Essential numbers",
+      sub: "Helplines",
+      Icon: Phone,
+      tint: colors.statusGreenFg,
+      onPress: () => navigation.navigate("EssentialNumbers"),
     },
     {
       key: "notifications",
-      title: t.notifications,
-      sub: t.notificationsSub,
+      title: "Notifications",
+      sub: "Case reminders",
       Icon: Bell,
-      onPress: () => navigation.navigate("Notifications"),
-    },
-    {
-      key: "language",
-      title: t.language,
-      sub: lang === "hi" ? "हिन्दी" : "English",
-      Icon: Languages,
-      onPress: () => navigation.navigate("Language"),
+      tint: "#7C3AED",
+      onPress: () => {
+        if (
+          !requireAccount(
+            navigation,
+            "Profile needed for notifications.",
+            loggedIn
+          )
+        )
+          return;
+        navigation.navigate("Notifications");
+      },
     },
     {
       key: "help",
-      title: t.help,
-      sub: t.helpSub,
+      title: "Help",
+      sub: "FAQs",
       Icon: CircleHelp,
+      tint: colors.water,
       onPress: () => navigation.navigate("HelpSupport"),
     },
     {
       key: "about",
-      title: t.about,
-      sub: "Version 1.0.0",
+      title: "About",
+      sub: "v1.1.1",
       Icon: Info,
+      tint: colors.navy,
       onPress: () => navigation.navigate("About"),
     },
   ] as const;
+
+  const initial =
+    loggedIn && profile ? profile.username.slice(0, 1).toUpperCase() : "?";
 
   return (
     <View style={styles.root}>
       <ScrollView
         contentContainerStyle={{
-          paddingTop: Math.max(insets.top, 10),
-          paddingBottom: 32,
+          paddingTop: Math.max(insets.top, 12),
+          paddingBottom: 36,
           paddingHorizontal: space.screen,
         }}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>{t.profile}</Text>
-            <Text style={styles.sub}>
-              {isGuest
-                ? "Continue as a guest, or create a profile when you want."
-                : t.profileSub}
-            </Text>
-          </View>
-          <Pressable
-            style={styles.settingsBtn}
-            onPress={() => navigation.navigate("Settings")}
-          >
-            <Settings size={20} color={colors.navy} strokeWidth={2.2} />
-          </Pressable>
+        <View style={styles.topRow}>
+          {onBackHome ? (
+            <Pressable
+              style={styles.back}
+              onPress={onBackHome}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
+              <ArrowLeft size={22} color={colors.navy} strokeWidth={2.2} />
+            </Pressable>
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
+          <Text style={styles.title}>Profile</Text>
+          <View style={{ width: 40 }} />
         </View>
 
         {loggedIn && profile ? (
           <Pressable
-            style={({ pressed }) => [styles.userCard, pressed && { opacity: 0.92 }]}
+            style={({ pressed }) => [
+              styles.card,
+              pressed && { opacity: 0.94 },
+            ]}
             onPress={() => navigation.navigate("EditProfile")}
           >
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarLetter}>
-                {profile.displayName.slice(0, 1).toUpperCase()}
-              </Text>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarLetter}>{initial}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{profile.displayName}</Text>
-              <Text style={styles.email}>@{profile.username}</Text>
-              <Text style={styles.loc}>Public posts stay anonymous</Text>
+              <Text style={styles.username}>@{profile.username}</Text>
+              <Text style={styles.hint}>Edit profile</Text>
             </View>
-            <ChevronRight size={20} color={colors.muted} />
+            <View style={styles.editChip}>
+              <Pencil size={14} color={colors.primaryBlue} strokeWidth={2.3} />
+            </View>
           </Pressable>
         ) : (
-          <View style={styles.userCard}>
-            <View style={styles.avatarFallback}>
-              <User size={22} color={colors.primaryBlue} strokeWidth={2.2} />
+          <View style={styles.card}>
+            <View style={styles.avatar}>
+              <UserRound size={24} color={colors.primaryBlue} strokeWidth={2.2} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.name}>Guest</Text>
-              <Text style={styles.email}>
-                No account yet. You can use the app fully as a guest.
-              </Text>
-              <Text style={styles.loc}>Public posts are always anonymous</Text>
+              <Text style={styles.username}>Guest</Text>
+              <Text style={styles.hint}>Create a profile to save cases</Text>
             </View>
           </View>
         )}
@@ -158,10 +185,6 @@ export default function ProfileScreen() {
             >
               <Text style={styles.secondaryBtnText}>Sign in</Text>
             </Pressable>
-            <Text style={styles.guestHint}>
-              Username and password stay on this phone. Posting publicly never
-              shows your name.
-            </Text>
           </View>
         ) : null}
 
@@ -172,12 +195,14 @@ export default function ProfileScreen() {
               style={({ pressed }) => [
                 styles.menuRow,
                 index < rows.length - 1 && styles.menuDivider,
-                pressed && { opacity: 0.85 },
+                pressed && { opacity: 0.88 },
               ]}
               onPress={row.onPress}
             >
-              <View style={styles.menuIcon}>
-                <row.Icon size={18} color={colors.primaryBlue} strokeWidth={2.2} />
+              <View
+                style={[styles.menuIcon, { backgroundColor: `${row.tint}16` }]}
+              >
+                <row.Icon size={18} color={row.tint} strokeWidth={2.2} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.menuTitle}>{row.title}</Text>
@@ -191,10 +216,10 @@ export default function ProfileScreen() {
         {loggedIn ? (
           <Pressable
             style={({ pressed }) => [styles.logout, pressed && { opacity: 0.9 }]}
-            onPress={onLogout}
+            onPress={onSignOut}
           >
             <LogOut size={18} color={colors.logoutFg} strokeWidth={2.2} />
-            <Text style={styles.logoutText}>Use as guest</Text>
+            <Text style={styles.logoutText}>Sign out</Text>
           </Pressable>
         ) : null}
       </ScrollView>
@@ -204,47 +229,39 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.white },
-  headerRow: {
+  topRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
   },
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: colors.navy,
-  },
-  sub: {
-    marginTop: 4,
-    fontSize: 13,
-    color: colors.mutedDark,
-    fontWeight: "500",
-  },
-  settingsBtn: {
+  back: {
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: colors.lightBlue,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
   },
-  userCard: {
-    marginTop: 20,
-    backgroundColor: colors.white,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    padding: 14,
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: colors.navy,
+  },
+  card: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-  },
-  avatarFallback: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
     backgroundColor: colors.lightBlue,
+    borderRadius: radii.lg,
+    padding: 16,
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.white,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -253,28 +270,31 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: colors.navy,
   },
-  name: {
-    fontSize: 16,
+  username: {
+    fontSize: 18,
     fontWeight: "800",
     color: colors.navy,
   },
-  email: {
-    marginTop: 2,
-    fontSize: 13,
-    color: colors.mutedDark,
-  },
-  loc: {
-    marginTop: 2,
+  hint: {
+    marginTop: 3,
     fontSize: 12,
-    color: colors.muted,
+    color: colors.mutedDark,
     fontWeight: "500",
   },
+  editChip: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   guestActions: {
-    marginTop: 14,
     gap: 10,
+    marginBottom: 16,
   },
   primaryBtn: {
-    backgroundColor: colors.primaryBlue,
+    backgroundColor: colors.navy,
     borderRadius: radii.lg,
     paddingVertical: 14,
     alignItems: "center",
@@ -290,21 +310,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.white,
   },
   secondaryBtnText: {
     color: colors.navy,
     fontSize: 15,
     fontWeight: "800",
   },
-  guestHint: {
-    fontSize: 12,
-    lineHeight: 17,
-    color: colors.muted,
-    textAlign: "center",
-  },
   menu: {
-    marginTop: 18,
     backgroundColor: colors.white,
     borderRadius: radii.lg,
     borderWidth: 1,
@@ -323,36 +335,36 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.hairline,
   },
   menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.lightBlue,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   menuTitle: {
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.navy,
   },
   menuSub: {
     marginTop: 2,
     fontSize: 12,
-    color: colors.muted,
+    color: colors.mutedDark,
+    fontWeight: "500",
   },
   logout: {
-    marginTop: 22,
-    backgroundColor: colors.logoutBg,
-    borderRadius: radii.lg,
-    paddingVertical: 16,
+    marginTop: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    backgroundColor: colors.logoutBg,
+    borderRadius: radii.lg,
+    paddingVertical: 14,
   },
   logoutText: {
     color: colors.logoutFg,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "800",
   },
 });

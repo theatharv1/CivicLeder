@@ -363,3 +363,61 @@ model CommunityTipVote {
   @@index([tipId])
   @@map("community_tip_votes")
 }
+
+/// Public alerts posted anonymously by app users; visible to everyone.
+model PublicAlert {
+  id               String    @id @default(uuid()) @db.Char(36)
+  type             String    @db.VarChar(32)
+  placeName        String    @map("place_name") @db.VarChar(255)
+  description      String    @db.Text
+  photoPath        String?   @map("photo_path") @db.VarChar(255)
+  latitude         Float
+  longitude        Float
+  areaLabel        String?   @map("area_label") @db.VarChar(120)
+  authorDeviceHash String    @map("author_device_hash") @db.VarChar(128)
+  seenCount        Int       @default(0) @map("seen_count")
+  goneCount        Int       @default(0) @map("gone_count")
+  flagCount        Int       @default(0) @map("flag_count")
+  /// active | resolved | flagged | removed
+  status           String    @default("active") @db.VarChar(16)
+  lastSeenAt       DateTime  @default(now()) @map("last_seen_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  votes PublicAlertVote[]
+  flags PublicAlertFlag[]
+
+  @@index([status, lastSeenAt])
+  @@index([authorDeviceHash, createdAt])
+  @@map("public_alerts")
+}
+
+model PublicAlertVote {
+  id         String   @id @default(uuid()) @db.Char(36)
+  alertId    String   @map("alert_id") @db.Char(36)
+  deviceHash String   @map("device_hash") @db.VarChar(128)
+  /// seen | gone
+  vote       String   @db.VarChar(16)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  alert PublicAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@unique([alertId, deviceHash])
+  @@index([alertId])
+  @@map("public_alert_votes")
+}
+
+model PublicAlertFlag {
+  id         String   @id @default(uuid()) @db.Char(36)
+  alertId    String   @map("alert_id") @db.Char(36)
+  deviceHash String   @map("device_hash") @db.VarChar(128)
+  reason     String?  @db.VarChar(255)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  alert PublicAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@unique([alertId, deviceHash])
+  @@index([alertId])
+  @@map("public_alert_flags")
+}

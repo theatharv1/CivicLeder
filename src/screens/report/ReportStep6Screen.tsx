@@ -10,25 +10,22 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
-  Building2,
   ChevronDown,
   ChevronLeft,
-  Construction,
-  Droplets,
-  Flame,
   Info,
   MapPin,
   Pencil,
-  Leaf,
-  Route,
-  Trash2,
-  Zap,
 } from "lucide-react-native";
 import LocationPickerModal from "../../components/LocationPickerModal";
 import StepProgress from "../../components/StepProgress";
+import { captureGps, isInIndia } from "../../lib/captureGps";
+import { resolveIssueLabel } from "../../lib/issueLabel";
 import { reportPhase } from "../../lib/reportPhase";
 import { useAppLocation } from "../../Context/LocationContext";
-import { useReportDraft } from "../../Context/ReportDraftContext";
+import {
+  hasIncidentLocation,
+  useReportDraft,
+} from "../../Context/ReportDraftContext";
 import {
   PROPERTY_CONTEXT_OPTIONS,
   authoritySlugForPropertyContext,
@@ -47,27 +44,23 @@ import {
 import {
   WATER_JURISDICTION_OPTIONS,
   authoritySlugForWaterJurisdiction,
-  waterGroupForIssueSlug,
   type WaterJurisdictionHint,
 } from "../../data/waterDrainageKnowledge";
 import {
   WASTE_JURISDICTION_OPTIONS,
   authoritySlugForWasteJurisdiction,
-  wasteGroupForIssueSlug,
   type WasteJurisdictionHint,
 } from "../../data/wasteGarbageKnowledge";
 import {
   ROADS_ASSET_OPTIONS,
   ROADS_JURISDICTION_OPTIONS,
   authoritySlugForRoadsJurisdiction,
-  roadsGroupForIssueSlug,
   type RoadsAssetHint,
   type RoadsJurisdictionHint,
 } from "../../data/roadsPublicSpacesKnowledge";
 import {
   ENVIRONMENT_JURISDICTION_OPTIONS,
   authoritySlugForEnvironmentJurisdiction,
-  environmentGroupForIssueSlug,
   type EnvironmentJurisdictionHint,
 } from "../../data/environmentKnowledge";
 import { REPORT_CATEGORIES } from "../../data/reportCategories";
@@ -86,12 +79,14 @@ type Props = NativeStackScreenProps<RootStackParamList, "ReportStep6">;
 
 export default function ReportStep6Screen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { location, setLocation } = useAppLocation();
+  const { location, setLocation, locationLabel } = useAppLocation();
   const {
     categoryId,
     issueTypeSlug,
     selectedAuthority,
     setSelectedAuthority,
+    locationDraft,
+    setLocationDraft,
     propertyContext,
     setPropertyContext,
     electricityProviderHint,
@@ -131,6 +126,56 @@ export default function ReportStep6Screen({ navigation }: Props) {
     isWasteGarbage ||
     isRoadsPublic ||
     isEnvironment;
+
+  // Silent GPS for notes — reject simulator / non-India locations.
+  useEffect(() => {
+    void (async () => {
+      const gps = await captureGps();
+      if (!gps) {
+        const lat = locationDraft.latitude;
+        const lng = locationDraft.longitude;
+        const foreign =
+          (lat != null && lng != null && !isInIndia(lat, lng)) ||
+          /san francisco|california|united states/i.test(
+            locationDraft.addressText ?? ""
+          );
+        if (foreign) {
+          setLocationDraft({
+            latitude: null,
+            longitude: null,
+            addressText: null,
+            currentLocation: null,
+          });
+        }
+        return;
+      }
+      if (
+        hasIncidentLocation(locationDraft) &&
+        locationDraft.latitude != null &&
+        locationDraft.longitude != null &&
+        isInIndia(locationDraft.latitude, locationDraft.longitude)
+      ) {
+        return;
+      }
+      const now = new Date().toISOString();
+      setLocationDraft({
+        latitude: gps.latitude,
+        longitude: gps.longitude,
+        addressText: gps.addressText,
+        accuracyMeters: gps.accuracyMeters,
+        locationSource: "current_gps",
+        locationCapturedAt: now,
+        currentLocation: {
+          latitude: gps.latitude,
+          longitude: gps.longitude,
+          accuracyMeters: gps.accuracyMeters,
+          addressText: gps.addressText,
+          capturedAt: now,
+        },
+      });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on enter
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -265,14 +310,12 @@ export default function ReportStep6Screen({ navigation }: Props) {
   }, [usesContextChips, authorities, primary]);
 
   /**
-   * Extra offices only when user expands “explore”.
-   * If we have no primary yet, show up to 3 so they can pick one.
+   * Extra offices only when user expands “see other offices”.
+   * Never dump a full DISCOM / municipal list by default.
    */
   const selectableOthers = useMemo(() => {
-    if (primary) {
-      if (!exploreOthers) return [];
-      return others.slice(0, 2);
-    }
+    if (!exploreOthers) return [];
+    if (primary) return others.slice(0, 2);
     if (usesContextChips) {
       return (contextHint?.alternatives ?? authorities).slice(0, 3);
     }
@@ -285,6 +328,9 @@ export default function ReportStep6Screen({ navigation }: Props) {
     contextHint,
     authorities,
   ]);
+
+  const issueLabel = resolveIssueLabel(categoryId, issueTypeSlug);
+  const CategoryIcon = category?.Icon;
 
   useEffect(() => {
     if (!usesContextChips || !hintSlug) return;
@@ -392,7 +438,7 @@ export default function ReportStep6Screen({ navigation }: Props) {
         >
           <MapPin size={13} color={colors.primaryBlue} strokeWidth={2.4} />
           <Text style={styles.locationText} numberOfLines={1}>
-            {location}
+            {locationLabel}
           </Text>
           <ChevronDown size={13} color={colors.primaryBlue} strokeWidth={2.4} />
         </Pressable>
@@ -415,33 +461,18 @@ export default function ReportStep6Screen({ navigation }: Props) {
 
         <Text style={styles.heading}>Most likely office</Text>
         <Text style={styles.sub}>
-          We suggest one office that usually handles this. You decide whether
-          to call or open their page. This app does not file for you.
+          Suggestion only. You contact them yourself.
         </Text>
 
         <View style={styles.issueCard}>
           <View style={styles.flameWrap}>
-            {isEnvironment ? (
-              <Leaf size={20} color={colors.environment} strokeWidth={2.2} />
-            ) : isRoadsPublic ? (
-              <Route size={20} color={colors.roads} strokeWidth={2.2} />
-            ) : isWasteGarbage ? (
-              <Trash2 size={20} color={colors.waste} strokeWidth={2.2} />
-            ) : isWaterDrainage ? (
-              <Droplets size={20} color={colors.water} strokeWidth={2.2} />
-            ) : isElectricity ? (
-              <Zap size={20} color={colors.electricity} strokeWidth={2.2} />
-            ) : isBuilding ? (
-              <Building2 size={20} color={colors.building} strokeWidth={2.2} />
-            ) : isConstruction ? (
-              <Construction
+            {CategoryIcon ? (
+              <CategoryIcon
                 size={20}
-                color={colors.construction}
+                color={category?.iconColor ?? colors.navy}
                 strokeWidth={2.2}
               />
-            ) : (
-              <Flame size={20} color={colors.fire} strokeWidth={2.2} />
-            )}
+            ) : null}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.issueLabel}>Your Issue</Text>
@@ -449,29 +480,7 @@ export default function ReportStep6Screen({ navigation }: Props) {
               {category?.title ?? "Concern"}
             </Text>
             <Text style={styles.issueDesc} numberOfLines={2}>
-              {isEnvironment
-                ? environmentGroupForIssueSlug(issueTypeSlug)?.label ??
-                  issueTypeSlug?.replace(/_/g, " ") ??
-                  category?.description ??
-                  "Reported concern"
-                : isRoadsPublic
-                ? roadsGroupForIssueSlug(issueTypeSlug)?.label ??
-                  issueTypeSlug?.replace(/_/g, " ") ??
-                  category?.description ??
-                  "Reported concern"
-                : isWasteGarbage
-                ? wasteGroupForIssueSlug(issueTypeSlug)?.label ??
-                  issueTypeSlug?.replace(/_/g, " ") ??
-                  category?.description ??
-                  "Reported concern"
-                : isWaterDrainage
-                  ? waterGroupForIssueSlug(issueTypeSlug)?.label ??
-                    issueTypeSlug?.replace(/_/g, " ") ??
-                    category?.description ??
-                    "Reported concern"
-                  : issueTypeSlug
-                    ? issueTypeSlug.replace(/_/g, " ")
-                    : category?.description ?? "Reported concern"}
+              {issueLabel}
             </Text>
           </View>
           <Pressable
@@ -652,8 +661,7 @@ export default function ReportStep6Screen({ navigation }: Props) {
                   <View style={styles.authInfoStrip}>
                     <Info size={14} color={colors.primaryBlue} />
                     <Text style={styles.authInfoText}>
-                      Most likely for your issue. Next: contact this office - 
-                      by need (emergency call, or complaint page).
+                      Most likely for this issue.
                     </Text>
                   </View>
                 </Pressable>
@@ -662,13 +670,23 @@ export default function ReportStep6Screen({ navigation }: Props) {
               <View style={styles.infoBanner}>
                 <Info size={16} color={colors.primaryBlue} />
                 <Text style={styles.infoText}>
-                  No single office stood out yet. Pick one below, or continue - 
-                  we still show verified contacts when we have them.
+                  Pick an office below, or continue for contacts.
                 </Text>
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.infoBanner}>
+                <Info size={16} color={colors.primaryBlue} />
+                <Text style={styles.infoText}>
+                  {isElectricity
+                    ? "Choose your company from the bill above, or open the list of possible companies."
+                    : "Confirm the office from your area or bill when you can. Open other offices only if needed."}
+                </Text>
+              </View>
+            )}
 
-            {primary && others.length > 0 ? (
+            {(primary && others.length > 0) ||
+            (!primary &&
+              (contextHint?.alternatives?.length || authorities.length) > 0) ? (
               <Pressable
                 style={styles.exploreBtn}
                 onPress={() => setExploreOthers((v) => !v)}
@@ -676,7 +694,11 @@ export default function ReportStep6Screen({ navigation }: Props) {
                 <Text style={styles.exploreBtnText}>
                   {exploreOthers
                     ? "Hide other offices"
-                    : "Not this one? See other possible offices"}
+                    : primary
+                      ? "Not this one? See other possible offices"
+                      : isElectricity
+                        ? "See possible electricity companies"
+                        : "See possible offices"}
                 </Text>
                 <ChevronDown
                   size={16}
@@ -692,7 +714,7 @@ export default function ReportStep6Screen({ navigation }: Props) {
             {selectableOthers.length > 0 ? (
               <>
                 <Text style={[styles.sectionTitle, { marginTop: 8 }]}>
-                  {primary ? "Other possible offices" : "Pick the most likely"}
+                  {primary ? "Other possible offices" : "Possible offices"}
                 </Text>
                 {selectableOthers.map((a) => (
                   <Pressable
@@ -765,7 +787,7 @@ export default function ReportStep6Screen({ navigation }: Props) {
         style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
       >
         <Pressable style={styles.continue} onPress={onContinue}>
-          <Text style={styles.continueText}>See how to contact them →</Text>
+          <Text style={styles.continueText}>Contact →</Text>
         </Pressable>
         <Pressable
           onPress={() => navigation.goBack()}

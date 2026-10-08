@@ -12,6 +12,7 @@ const env = (globalThis as { process?: { env?: ExpoPublicEnv } }).process?.env;
 const baseUrl = (env?.EXPO_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 export const apiConfigured = Boolean(baseUrl);
+export const apiBaseUrl = baseUrl;
 
 type ApiSuccess<T> = { success: true; data: T };
 type ApiFailure = {

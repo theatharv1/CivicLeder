@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,7 +13,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  FileText,
   Info,
   MapPin,
   Pencil,
@@ -30,48 +28,33 @@ import { reportPhase } from "../../lib/reportPhase";
 import {
   BUILDING_CITIZEN_TIPS,
   BUILDING_GROUPS,
-  BUILDING_KNOWLEDGE_CARDS,
-  UBBL_2016_SOURCE,
   buildingGroupForIssueSlug,
   isBuildingEmergencyIssue,
 } from "../../data/buildingKnowledge";
 import {
   CONSTRUCTION_CITIZEN_TIPS,
   CONSTRUCTION_GROUPS,
-  CONSTRUCTION_KNOWLEDGE_CARDS,
   constructionGroupForIssueSlug,
   isConstructionEmergencyIssue,
 } from "../../data/constructionKnowledge";
-import {
-  ELECTRICITY_KNOWLEDGE_CARDS,
-  ELECTRICITY_RIGHTS_SOURCE,
-  isElectricityEmergencyIssue,
-} from "../../data/electricityKnowledge";
+import { isElectricityEmergencyIssue } from "../../data/electricityKnowledge";
 import {
   WATER_DRAINAGE_GROUPS,
-  WATER_DRAINAGE_KNOWLEDGE_CARDS,
-  WATER_DRAINAGE_RIGHTS_SOURCE,
   isWaterEmergencyIssue,
   waterGroupForIssueSlug,
 } from "../../data/waterDrainageKnowledge";
 import {
   WASTE_GARBAGE_GROUPS,
-  WASTE_GARBAGE_KNOWLEDGE_CARDS,
-  WASTE_GARBAGE_RIGHTS_SOURCE,
   isWasteEmergencyIssue,
   wasteGroupForIssueSlug,
 } from "../../data/wasteGarbageKnowledge";
 import {
   ROADS_PUBLIC_SPACES_GROUPS,
-  ROADS_PUBLIC_SPACES_KNOWLEDGE_CARDS,
-  ROADS_PUBLIC_SPACES_RIGHTS_SOURCE,
   isRoadsEmergencyIssue,
   roadsGroupForIssueSlug,
 } from "../../data/roadsPublicSpacesKnowledge";
 import {
   ENVIRONMENT_GROUPS,
-  ENVIRONMENT_KNOWLEDGE_CARDS,
-  ENVIRONMENT_RIGHTS_SOURCE,
   isEnvironmentEmergencyIssue,
   environmentGroupForIssueSlug,
 } from "../../data/environmentKnowledge";
@@ -81,6 +64,18 @@ import {
   animalsGroupForIssueSlug,
   isAnimalsEmergencyIssue,
 } from "../../data/animalsKnowledge";
+import {
+  FALLBACK_WOMEN_SAFETY_ISSUE_TYPES,
+  WOMEN_SAFETY_GROUPS,
+  isWomenSafetyEmergencyIssue,
+  womenGroupForIssueSlug,
+} from "../../data/womenSafetyFallback";
+import {
+  FALLBACK_POLICE_HELP_ISSUE_TYPES,
+  POLICE_HELP_GROUPS,
+  isPoliceHelpEmergencyIssue,
+  policeGroupForIssueSlug,
+} from "../../data/policeHelpFallback";
 import type { IssueTypeRow } from "../../data/emergencyFallback";
 import {
   FALLBACK_BUILDING_ISSUE_TYPES,
@@ -116,80 +111,25 @@ const CATEGORY_INCLUDES: Partial<Record<ReportCategoryId, readonly string[]>> =
     fire_safety: FIRE_INCLUDES,
   };
 
-const CATEGORY_RULES: Partial<
-  Record<
-    ReportCategoryId,
-    { title: string; body: string; knowMoreUrl: string; knowMoreLabel: string }
-  >
-> = {
-  fire_safety: {
-    title: "National Building Code (NBC)",
-    body: "Specifies fire safety requirements for buildings, emergency exits, and fire-fighting systems.",
-    knowMoreUrl: "https://dfs.delhi.gov.in/",
-    knowMoreLabel: "Know more about fire safety rules in Delhi →",
-  },
-  building: {
-    title: "Delhi building rulebook (UBBL)",
-    body: "Official DDA page - open only if you want the full text.",
-    knowMoreUrl: UBBL_2016_SOURCE.url,
-    knowMoreLabel: "Open official DDA page →",
-  },
-  construction: {
-    title: "Construction & pollution channels",
-    body: "Official portals for dust / site complaints - optional reading.",
-    knowMoreUrl: "https://greendelhi.nic.in/",
-    knowMoreLabel: "Open Green Delhi →",
-  },
-  electricity: {
-    title: ELECTRICITY_RIGHTS_SOURCE.title,
-    body: "Consumer rights on connection timelines, metering, billing and grievance redressal. Delhi metropolitan timelines need DERC/DISCOM confirmation - not unconditional promises. This app does not file for you.",
-    knowMoreUrl: ELECTRICITY_RIGHTS_SOURCE.url,
-    knowMoreLabel: "Open Ministry of Power Acts & Notifications →",
-  },
-  water_drainage: {
-    title: WATER_DRAINAGE_RIGHTS_SOURCE.title,
-    body: "Water supply, sewerage, drainage and waterlogging use different official channels. Not every water issue goes to DJB. Timelines: see the current official service standard. This app does not file for you.",
-    knowMoreUrl: WATER_DRAINAGE_RIGHTS_SOURCE.url,
-    knowMoreLabel: "Open Delhi Jal Board official website →",
-  },
-  waste_garbage: {
-    title: WASTE_GARBAGE_RIGHTS_SOURCE.title,
-    body: "Garbage collection, dumping, burning and specialized waste use different official channels. Not every waste issue goes to MCD or DPCC. This app does not file for you.",
-    knowMoreUrl: WASTE_GARBAGE_RIGHTS_SOURCE.url,
-    knowMoreLabel: "Open MCD Online feedback (complaints) →",
-  },
-  roads_public: {
-    title: ROADS_PUBLIC_SPACES_RIGHTS_SOURCE.title,
-    body: "A pothole is not always MCD or PWD. Traffic Police is not for every road repair. Streetlights often follow Electricity / DISCOM channels. This app does not file for you.",
-    knowMoreUrl: ROADS_PUBLIC_SPACES_RIGHTS_SOURCE.url,
-    knowMoreLabel: "Open MCD Online feedback (complaints) →",
-  },
-  animals: {
-    title: "Animals on public land",
-    body: "Most stray cattle, dog and dead-animal reports go to MCD 311 / 155305 (NDMC areas differ). Attack in progress - 112 first. This app does not file for you.",
-    knowMoreUrl: "https://mcdonline.nic.in/",
-    knowMoreLabel: "Open MCD Online →",
-  },
-  environment: {
-    title: ENVIRONMENT_RIGHTS_SOURCE.title,
-    body: "Not every environment issue goes to DPCC. Noise uses NGMS / 155271. Trees and wildlife use Forest channels. Air / general pollution often uses Green Delhi. This app does not file for you.",
-    knowMoreUrl: ENVIRONMENT_RIGHTS_SOURCE.ngms,
-    knowMoreLabel: "Open NGMS noise portal →",
-  },
-};
-
-/** Report Step 2 - Understand the Issue (Fire Safety design as source of truth). */
-export default function ReportStep2Screen({ navigation }: Props) {
+/** First stepped screen after category (Home shortcut skips category picker). */
+export default function ReportStep2Screen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
-  const { location, setLocation } = useAppLocation();
-  const { categoryId, setIssueTypeSlug, issueTypeSlug } = useReportDraft();
+  const { location, setLocation, locationLabel } = useAppLocation();
+  const { categoryId, setCategoryId, setIssueTypeSlug, issueTypeSlug } =
+    useReportDraft();
   const [locationOpen, setLocationOpen] = useState(false);
   const [typedIssues, setTypedIssues] = useState<IssueTypeRow[]>([]);
   const [showOfficialRules, setShowOfficialRules] = useState(false);
 
+  useEffect(() => {
+    if (route.params?.category) {
+      setCategoryId(route.params.category);
+    }
+  }, [route.params?.category, setCategoryId]);
+
   const category =
     REPORT_CATEGORIES.find((c) => c.id === categoryId) ??
-    REPORT_CATEGORIES.find((c) => c.id === "fire_safety")!;
+    REPORT_CATEGORIES.find((c) => c.id === "something_else")!;
 
   const isFire = category.id === "fire_safety";
   const isBuilding = category.id === "building";
@@ -200,6 +140,8 @@ export default function ReportStep2Screen({ navigation }: Props) {
   const isRoadsPublic = category.id === "roads_public";
   const isEnvironment = category.id === "environment";
   const isAnimals = category.id === "animals";
+  const isWomenSafety = category.id === "women_safety";
+  const isPoliceHelp = category.id === "police_help";
   const usesTypedIssues =
     isBuilding ||
     isConstruction ||
@@ -208,7 +150,9 @@ export default function ReportStep2Screen({ navigation }: Props) {
     isWasteGarbage ||
     isRoadsPublic ||
     isEnvironment ||
-    isAnimals;
+    isAnimals ||
+    isWomenSafety ||
+    isPoliceHelp;
   const usesGroupedIssues =
     isBuilding ||
     isConstruction ||
@@ -216,43 +160,28 @@ export default function ReportStep2Screen({ navigation }: Props) {
     isWasteGarbage ||
     isRoadsPublic ||
     isEnvironment ||
-    isAnimals;
-  const fallbackTypes = isAnimals
-    ? FALLBACK_ANIMALS_ISSUE_TYPES
-    : isEnvironment
-    ? FALLBACK_ENVIRONMENT_ISSUE_TYPES
-    : isRoadsPublic
-      ? FALLBACK_ROADS_PUBLIC_SPACES_ISSUE_TYPES
-      : isWasteGarbage
-        ? FALLBACK_WASTE_GARBAGE_ISSUE_TYPES
-        : isWaterDrainage
-          ? FALLBACK_WATER_DRAINAGE_ISSUE_TYPES
-          : isElectricity
-            ? FALLBACK_ELECTRICITY_ISSUE_TYPES
-            : isConstruction
-              ? FALLBACK_CONSTRUCTION_ISSUE_TYPES
-              : FALLBACK_BUILDING_ISSUE_TYPES;
-  const knowledgeCards = isAnimals
-    ? ANIMALS_CITIZEN_TIPS.map((t) => ({
-        id: t.id,
-        title: t.title,
-        body: t.plain,
-        sourceLabel: t.whereLabel,
-        sourceUrl: t.whereUrl,
-      }))
-    : isEnvironment
-    ? ENVIRONMENT_KNOWLEDGE_CARDS
-    : isRoadsPublic
-      ? ROADS_PUBLIC_SPACES_KNOWLEDGE_CARDS
-      : isWasteGarbage
-        ? WASTE_GARBAGE_KNOWLEDGE_CARDS
-        : isWaterDrainage
-          ? WATER_DRAINAGE_KNOWLEDGE_CARDS
-          : isElectricity
-            ? ELECTRICITY_KNOWLEDGE_CARDS
-            : isConstruction
-              ? CONSTRUCTION_KNOWLEDGE_CARDS
-              : BUILDING_KNOWLEDGE_CARDS;
+    isAnimals ||
+    isWomenSafety ||
+    isPoliceHelp;
+  const fallbackTypes = isWomenSafety
+    ? FALLBACK_WOMEN_SAFETY_ISSUE_TYPES
+    : isPoliceHelp
+      ? FALLBACK_POLICE_HELP_ISSUE_TYPES
+      : isAnimals
+        ? FALLBACK_ANIMALS_ISSUE_TYPES
+        : isEnvironment
+          ? FALLBACK_ENVIRONMENT_ISSUE_TYPES
+          : isRoadsPublic
+            ? FALLBACK_ROADS_PUBLIC_SPACES_ISSUE_TYPES
+            : isWasteGarbage
+              ? FALLBACK_WASTE_GARBAGE_ISSUE_TYPES
+              : isWaterDrainage
+                ? FALLBACK_WATER_DRAINAGE_ISSUE_TYPES
+                : isElectricity
+                  ? FALLBACK_ELECTRICITY_ISSUE_TYPES
+                  : isConstruction
+                    ? FALLBACK_CONSTRUCTION_ISSUE_TYPES
+                    : FALLBACK_BUILDING_ISSUE_TYPES;
   const citizenTips = isBuilding
     ? BUILDING_CITIZEN_TIPS
     : isConstruction
@@ -269,6 +198,18 @@ export default function ReportStep2Screen({ navigation }: Props) {
     }
     if (isAnimals) {
       setTypedIssues(FALLBACK_ANIMALS_ISSUE_TYPES);
+      return () => {
+        alive = false;
+      };
+    }
+    if (isWomenSafety) {
+      setTypedIssues(FALLBACK_WOMEN_SAFETY_ISSUE_TYPES);
+      return () => {
+        alive = false;
+      };
+    }
+    if (isPoliceHelp) {
+      setTypedIssues(FALLBACK_POLICE_HELP_ISSUE_TYPES);
       return () => {
         alive = false;
       };
@@ -320,46 +261,54 @@ export default function ReportStep2Screen({ navigation }: Props) {
     isRoadsPublic,
     isEnvironment,
     isAnimals,
+    isWomenSafety,
+    isPoliceHelp,
   ]);
 
   const includes: readonly string[] = usesTypedIssues
-    ? isAnimals
-      ? ANIMALS_GROUPS.map((g) => g.label)
-      : isEnvironment
-      ? ENVIRONMENT_GROUPS.map((g) => g.label)
-      : isRoadsPublic
-      ? ROADS_PUBLIC_SPACES_GROUPS.map((g) => g.label)
-      : isWasteGarbage
-        ? WASTE_GARBAGE_GROUPS.map((g) => g.label)
-        : isWaterDrainage
-          ? WATER_DRAINAGE_GROUPS.map((g) => g.label)
-          : isConstruction
-            ? CONSTRUCTION_GROUPS.map((g) => g.label)
-            : isBuilding
-              ? BUILDING_GROUPS.map((g) => g.label)
-              : (typedIssues.length ? typedIssues : fallbackTypes).map(
-                  (t) => t.name
-                )
+    ? isWomenSafety
+      ? WOMEN_SAFETY_GROUPS.map((g) => g.label)
+      : isPoliceHelp
+        ? POLICE_HELP_GROUPS.map((g) => g.label)
+        : isAnimals
+          ? ANIMALS_GROUPS.map((g) => g.label)
+          : isEnvironment
+            ? ENVIRONMENT_GROUPS.map((g) => g.label)
+            : isRoadsPublic
+              ? ROADS_PUBLIC_SPACES_GROUPS.map((g) => g.label)
+              : isWasteGarbage
+                ? WASTE_GARBAGE_GROUPS.map((g) => g.label)
+                : isWaterDrainage
+                  ? WATER_DRAINAGE_GROUPS.map((g) => g.label)
+                  : isConstruction
+                    ? CONSTRUCTION_GROUPS.map((g) => g.label)
+                    : isBuilding
+                      ? BUILDING_GROUPS.map((g) => g.label)
+                      : (typedIssues.length ? typedIssues : fallbackTypes).map(
+                          (t) => t.name
+                        )
     : (categoryId && CATEGORY_INCLUDES[categoryId]) || FIRE_INCLUDES;
-  const rules =
-    (categoryId && CATEGORY_RULES[categoryId]) || CATEGORY_RULES.fire_safety!;
   const Icon = category.Icon;
   const selectedTyped = usesTypedIssues
     ? usesGroupedIssues
       ? (() => {
-          const g = isBuilding
-            ? buildingGroupForIssueSlug(issueTypeSlug)
-            : isConstruction
-              ? constructionGroupForIssueSlug(issueTypeSlug)
-              : isAnimals
-                ? animalsGroupForIssueSlug(issueTypeSlug)
-                : isEnvironment
-                ? environmentGroupForIssueSlug(issueTypeSlug)
-                : isRoadsPublic
-                  ? roadsGroupForIssueSlug(issueTypeSlug)
-                  : isWasteGarbage
-                    ? wasteGroupForIssueSlug(issueTypeSlug)
-                    : waterGroupForIssueSlug(issueTypeSlug);
+          const g = isWomenSafety
+            ? womenGroupForIssueSlug(issueTypeSlug)
+            : isPoliceHelp
+              ? policeGroupForIssueSlug(issueTypeSlug)
+              : isBuilding
+                ? buildingGroupForIssueSlug(issueTypeSlug)
+                : isConstruction
+                  ? constructionGroupForIssueSlug(issueTypeSlug)
+                  : isAnimals
+                    ? animalsGroupForIssueSlug(issueTypeSlug)
+                    : isEnvironment
+                      ? environmentGroupForIssueSlug(issueTypeSlug)
+                      : isRoadsPublic
+                        ? roadsGroupForIssueSlug(issueTypeSlug)
+                        : isWasteGarbage
+                          ? wasteGroupForIssueSlug(issueTypeSlug)
+                          : waterGroupForIssueSlug(issueTypeSlug);
           return g
             ? {
                 slug: g.representativeSlug,
@@ -415,6 +364,17 @@ export default function ReportStep2Screen({ navigation }: Props) {
       (isAnimalsEmergencyIssue(issueTypeSlug) ||
         Boolean(
           selectedTyped?.slug && isAnimalsEmergencyIssue(selectedTyped.slug)
+        ))) ||
+    (isWomenSafety &&
+      (isWomenSafetyEmergencyIssue(issueTypeSlug) ||
+        Boolean(
+          selectedTyped?.slug &&
+            isWomenSafetyEmergencyIssue(selectedTyped.slug)
+        ))) ||
+    (isPoliceHelp &&
+      (isPoliceHelpEmergencyIssue(issueTypeSlug) ||
+        Boolean(
+          selectedTyped?.slug && isPoliceHelpEmergencyIssue(selectedTyped.slug)
         )));
 
   const onContinue = () => {
@@ -442,7 +402,7 @@ export default function ReportStep2Screen({ navigation }: Props) {
         >
           <MapPin size={13} color={colors.primaryBlue} strokeWidth={2.4} />
           <Text style={styles.locationText} numberOfLines={1}>
-            {location}
+            {locationLabel}
           </Text>
           <ChevronDown size={13} color={colors.primaryBlue} strokeWidth={2.4} />
         </Pressable>
@@ -464,10 +424,7 @@ export default function ReportStep2Screen({ navigation }: Props) {
         </View>
 
         <Text style={styles.heading}>What did you notice?</Text>
-        <Text style={styles.sub}>
-          Pick the closest match. Short tips below explain what it means - open
-          a tip only if you want more.
-        </Text>
+        <Text style={styles.sub}>Tap the closest match.</Text>
 
         <View
           style={[
@@ -484,7 +441,13 @@ export default function ReportStep2Screen({ navigation }: Props) {
           </View>
           <Pressable
             style={styles.changeBtn}
-            onPress={() => navigation.goBack()}
+            onPress={() =>
+              navigation.navigate({
+                name: "ReportStep1",
+                params: { category: categoryId },
+                merge: false,
+              })
+            }
           >
             <Pencil size={13} color={colors.linkBlue} strokeWidth={2.2} />
             <Text style={styles.changeText}>Change</Text>
@@ -493,7 +456,6 @@ export default function ReportStep2Screen({ navigation }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>What does this include?</Text>
-          <Text style={styles.cardSub}>Tap one that matches what you saw.</Text>
 
           <View style={styles.includeRow}>
             <View style={styles.includeList}>
@@ -519,6 +481,20 @@ export default function ReportStep2Screen({ navigation }: Props) {
                     }
                     if (isAnimals) {
                       const group = ANIMALS_GROUPS.find(
+                        (g) => g.label === item
+                      );
+                      if (group) setIssueTypeSlug(group.representativeSlug);
+                      return;
+                    }
+                    if (isWomenSafety) {
+                      const group = WOMEN_SAFETY_GROUPS.find(
+                        (g) => g.label === item
+                      );
+                      if (group) setIssueTypeSlug(group.representativeSlug);
+                      return;
+                    }
+                    if (isPoliceHelp) {
+                      const group = POLICE_HELP_GROUPS.find(
                         (g) => g.label === item
                       );
                       if (group) setIssueTypeSlug(group.representativeSlug);
@@ -565,26 +541,35 @@ export default function ReportStep2Screen({ navigation }: Props) {
                       usesTypedIssues &&
                         issueTypeSlug &&
                         (usesGroupedIssues
-                          ? (isBuilding
-                              ? buildingGroupForIssueSlug(issueTypeSlug)
-                                  ?.label
-                              : isConstruction
-                                ? constructionGroupForIssueSlug(issueTypeSlug)
-                                    ?.label
-                                : isAnimals
-                                  ? animalsGroupForIssueSlug(issueTypeSlug)
+                          ? (isWomenSafety
+                              ? womenGroupForIssueSlug(issueTypeSlug)?.label
+                              : isPoliceHelp
+                                ? policeGroupForIssueSlug(issueTypeSlug)?.label
+                                : isBuilding
+                                  ? buildingGroupForIssueSlug(issueTypeSlug)
                                       ?.label
-                                  : isEnvironment
-                                  ? environmentGroupForIssueSlug(issueTypeSlug)
-                                      ?.label
-                                  : isRoadsPublic
-                                    ? roadsGroupForIssueSlug(issueTypeSlug)
-                                        ?.label
-                                    : isWasteGarbage
-                                      ? wasteGroupForIssueSlug(issueTypeSlug)
+                                  : isConstruction
+                                    ? constructionGroupForIssueSlug(
+                                        issueTypeSlug
+                                      )?.label
+                                    : isAnimals
+                                      ? animalsGroupForIssueSlug(issueTypeSlug)
                                           ?.label
-                                      : waterGroupForIssueSlug(issueTypeSlug)
-                                          ?.label) === item
+                                      : isEnvironment
+                                        ? environmentGroupForIssueSlug(
+                                            issueTypeSlug
+                                          )?.label
+                                        : isRoadsPublic
+                                          ? roadsGroupForIssueSlug(
+                                              issueTypeSlug
+                                            )?.label
+                                          : isWasteGarbage
+                                            ? wasteGroupForIssueSlug(
+                                                issueTypeSlug
+                                              )?.label
+                                            : waterGroupForIssueSlug(
+                                                issueTypeSlug
+                                              )?.label) === item
                           : (typedIssues.length
                               ? typedIssues
                               : fallbackTypes
@@ -642,80 +627,26 @@ export default function ReportStep2Screen({ navigation }: Props) {
 
         {citizenTips ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Know before you report</Text>
-            <Text style={styles.cardSub}>
-              Tap a line to read. Websites open only if you ask.
-            </Text>
-            <CitizenTipList tips={citizenTips} previewCount={4} />
-          </View>
-        ) : usesTypedIssues ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Quick facts</Text>
-            <Text style={styles.cardSub}>Tap only if you want detail.</Text>
-            {knowledgeCards.slice(0, 3).map((card) => (
-              <Pressable
-                key={card.id}
-                style={styles.ruleRow}
-                onPress={() => void Linking.openURL(card.sourceUrl)}
-              >
-                <View style={styles.ruleIcon}>
-                  <FileText
-                    size={18}
-                    color={colors.primaryBlue}
-                    strokeWidth={2.2}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.ruleTitle}>{card.title}</Text>
-                </View>
-                <ChevronRight size={18} color={colors.linkBlue} />
-              </Pressable>
-            ))}
+            <Pressable
+              style={styles.ruleHead}
+              onPress={() => setShowOfficialRules((v) => !v)}
+            >
+              <Text style={styles.cardTitle}>Tips (optional)</Text>
+              <ChevronDown
+                size={18}
+                color={colors.linkBlue}
+                style={{
+                  transform: [
+                    { rotate: showOfficialRules ? "180deg" : "0deg" },
+                  ],
+                }}
+              />
+            </Pressable>
+            {showOfficialRules ? (
+              <CitizenTipList tips={citizenTips} previewCount={3} />
+            ) : null}
           </View>
         ) : null}
-
-        <View style={styles.card}>
-          <Pressable
-            style={styles.ruleHead}
-            onPress={() => setShowOfficialRules((v) => !v)}
-          >
-            <Text style={styles.cardTitle}>Official page (optional)</Text>
-            <ChevronDown
-              size={18}
-              color={colors.linkBlue}
-              style={{
-                transform: [
-                  { rotate: showOfficialRules ? "180deg" : "0deg" },
-                ],
-              }}
-            />
-          </Pressable>
-          {showOfficialRules ? (
-            <>
-              <Text style={styles.cardSub}>
-                For people who want the original rulebook - not required to
-                continue.
-              </Text>
-              <Pressable
-                style={styles.ruleRow}
-                onPress={() => void Linking.openURL(rules.knowMoreUrl)}
-              >
-                <View style={styles.ruleIcon}>
-                  <FileText
-                    size={18}
-                    color={colors.primaryBlue}
-                    strokeWidth={2.2}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.ruleTitle}>{rules.title}</Text>
-                  <Text style={styles.ruleBody}>{rules.body}</Text>
-                </View>
-                <ChevronRight size={18} color={colors.linkBlue} />
-              </Pressable>
-            </>
-          ) : null}
-        </View>
 
         <Pressable style={styles.notEmergency} onPress={onContinue}>
           <View style={styles.shieldWrap}>
@@ -740,22 +671,6 @@ export default function ReportStep2Screen({ navigation }: Props) {
         <Pressable onPress={onContinue} style={styles.continue}>
           <Text style={styles.continueText}>Continue →</Text>
         </Pressable>
-        <Pressable
-          onPress={() =>
-            navigation.navigate("ContributeTip", {
-              categorySlug: categoryId ?? "building",
-            })
-          }
-          style={styles.contribLink}
-        >
-          <Text style={styles.contribLinkText}>
-            Know a better tip for this issue? Contribute →
-          </Text>
-        </Pressable>
-        <View style={styles.refRow}>
-          <Info size={13} color={colors.linkBlue} strokeWidth={2.2} />
-          <Text style={styles.refText}>This information is for your reference.</Text>
-        </View>
       </View>
 
       <LocationPickerModal

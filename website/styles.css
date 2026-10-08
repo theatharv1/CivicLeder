@@ -6,6 +6,7 @@
   --bg: #ffffff;
   --soft: #f4f7fb;
   --ink: #163a6b;
+  --green: #1b7a3e;
 }
 
 * {
@@ -20,7 +21,10 @@ body {
   margin: 0;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   color: var(--navy);
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 420px at 10% -10%, #e8f0ff 0%, transparent 55%),
+    radial-gradient(900px 380px at 100% 0%, #eef6ff 0%, transparent 50%),
+    var(--bg);
   line-height: 1.55;
 }
 
@@ -44,6 +48,7 @@ a:hover {
   padding: 14px 20px;
   background: rgba(255, 255, 255, 0.96);
   border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(8px);
 }
 
 .brand {
@@ -74,7 +79,7 @@ nav a[aria-current="page"] {
 .hero,
 .block,
 .policy {
-  max-width: 880px;
+  max-width: 920px;
   margin: 0 auto;
   padding: 40px 20px;
 }
@@ -105,10 +110,16 @@ h3 {
   margin: 0 0 8px;
 }
 
-.lead {
+.subhead {
+  margin-top: 28px;
+  margin-bottom: 12px;
+}
+
+.lead,
+.section-lead {
   font-size: 1.1rem;
   color: var(--ink);
-  max-width: 38rem;
+  max-width: 40rem;
 }
 
 .hero-actions {
@@ -124,8 +135,11 @@ h3 {
   color: #fff;
   font-weight: 700;
   padding: 12px 18px;
-  border-radius: 999px;
+  border-radius: 12px;
   text-decoration: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
 }
 
 .btn:hover {
@@ -142,8 +156,8 @@ h3 {
 .block.alt {
   background: var(--soft);
   max-width: none;
-  padding-left: max(20px, calc((100% - 880px) / 2 + 20px));
-  padding-right: max(20px, calc((100% - 880px) / 2 + 20px));
+  padding-left: max(20px, calc((100% - 920px) / 2 + 20px));
+  padding-right: max(20px, calc((100% - 920px) / 2 + 20px));
 }
 
 .steps {
@@ -155,11 +169,16 @@ h3 {
 }
 
 .steps li {
-  background: var(--soft);
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 16px 18px;
   display: grid;
   gap: 4px;
+}
+
+.block.alt .steps li {
+  background: #fff;
 }
 
 .steps span {
@@ -185,6 +204,31 @@ h3 {
   padding: 18px;
 }
 
+.feature-cards article {
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.feature-cards article:hover {
+  border-color: #b9cdf0;
+  transform: translateY(-2px);
+}
+
+.icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #e8f0ff;
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+}
+
+.icon-wrap svg {
+  width: 22px;
+  height: 22px;
+}
+
 .cards p,
 .plain {
   color: var(--muted);
@@ -197,6 +241,89 @@ h3 {
 
 .plain li {
   margin-bottom: 8px;
+}
+
+.dial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.dial {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  text-decoration: none;
+  color: var(--navy);
+}
+
+.dial:hover {
+  border-color: var(--blue);
+  text-decoration: none;
+}
+
+.dial-num {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--blue);
+}
+
+.dial-label {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.link-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.link-list li {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.link-list span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.contact-form {
+  margin-top: 20px;
+  display: grid;
+  gap: 12px;
+  max-width: 480px;
+}
+
+.contact-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.contact-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  font: inherit;
+  color: var(--navy);
+  background: var(--soft);
+  resize: vertical;
 }
 
 .cta {
@@ -230,6 +357,7 @@ h3 {
   text-align: center;
   color: var(--muted);
   font-size: 14px;
+  background: #fff;
 }
 
 .foot p {

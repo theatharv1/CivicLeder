@@ -11,16 +11,45 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ArrowLeft } from "lucide-react-native";
+import {
+  ArrowLeft,
+  Bookmark,
+  FileText,
+  Phone,
+  Shield,
+} from "lucide-react-native";
 import { useProfile } from "../Context/ProfileContext";
 import { APP_NAME } from "../lib/brand";
 import { deleteAllLocalUserData } from "../lib/userData";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, radii, space } from "../theme/tokens";
 
-const LOGO = require("../../assets/images/civicleader-logo.png");
+const LOGO = require("../../assets/images/icon.png");
 
 type Props = NativeStackScreenProps<RootStackParamList, "About">;
+
+const POINTS = [
+  {
+    Icon: FileText,
+    title: "Guide",
+    body: "Find the right office for a civic problem.",
+  },
+  {
+    Icon: Phone,
+    title: "You file",
+    body: "Call or open their site yourself. We don’t file.",
+  },
+  {
+    Icon: Bookmark,
+    title: "My Cases",
+    body: "Save tracking IDs and websites (profile needed).",
+  },
+  {
+    Icon: Shield,
+    title: "Public alerts",
+    body: "See and confirm problems near you. Profile needed to post.",
+  },
+] as const;
 
 export default function AboutScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -30,11 +59,11 @@ export default function AboutScreen({ navigation }: Props) {
   const onDeleteData = () => {
     Alert.alert(
       "Delete my data on this phone?",
-      "This removes your local alerts, tips, case notes, votes, device id, and any username profile saved here. It does not change anything at government offices. This cannot be undone.",
+      "Removes local alerts, tips, cases, and profile on this device. Not government data.",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Delete everything",
+          text: "Delete",
           style: "destructive",
           onPress: () => {
             void (async () => {
@@ -42,15 +71,9 @@ export default function AboutScreen({ navigation }: Props) {
               try {
                 await deleteAllLocalUserData();
                 resetToGuest();
-                Alert.alert(
-                  "Data deleted",
-                  "This phone is clear. You are back as a guest."
-                );
+                Alert.alert("Done", "This phone is clear. You’re a guest again.");
               } catch {
-                Alert.alert(
-                  "Could not delete",
-                  "Try again. If it keeps failing, reinstall the app."
-                );
+                Alert.alert("Could not delete", "Try again or reinstall.");
               } finally {
                 setDeleting(false);
               }
@@ -75,60 +98,26 @@ export default function AboutScreen({ navigation }: Props) {
         </Pressable>
 
         <Image source={LOGO} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.title}>About {APP_NAME}</Text>
-
-        <Text style={styles.body}>
-          {APP_NAME} is a citizen guide for Delhi. Spot a civic problem - unsafe
-          building, fire risk, water, roads, pollution - and the app helps you
-          understand it and find the right official office. You open their page
-          or call them yourself.
+        <Text style={styles.title}>{APP_NAME}</Text>
+        <Text style={styles.tagline}>
+          Delhi citizen guide. Not a complaint portal.
         </Text>
 
-        <Text style={styles.section}>What it does</Text>
-        <Text style={styles.body}>
-          • Explains the problem in plain words{"\n"}
-          • Checks if anyone may be in danger{"\n"}
-          • Suggests the most likely office{"\n"}
-          • Shows how to contact them - call or official page{"\n"}
-          • Lets you keep personal notes, including their reference if they gave
-          you one
-        </Text>
+        {POINTS.map((p) => (
+          <View key={p.title} style={styles.row}>
+            <View style={styles.iconWrap}>
+              <p.Icon size={20} color={colors.primaryBlue} strokeWidth={2.2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>{p.title}</Text>
+              <Text style={styles.rowBody}>{p.body}</Text>
+            </View>
+          </View>
+        ))}
 
-        <Text style={styles.section}>What it does not do</Text>
-        <Text style={styles.body}>
-          • It is not a government department{"\n"}
-          • It does not file complaints for you{"\n"}
-          • It does not create government complaint numbers{"\n"}
-          • It does not replace MCD311, Green Delhi, DJB 1916, or other official
-          apps
-        </Text>
-
-        <Text style={styles.section}>In short</Text>
-        <Text style={styles.body}>
-          Official apps like MCD311 are the counter. {APP_NAME} is the guide
-          that points you there and keeps your own notes - not an official
-          receipt.
-        </Text>
-
-        <Text style={styles.section}>Community tips</Text>
-        <Text style={styles.body}>
-          Neighbours can share short tips and optional .gov.in links. Others
-          can mark “Seen this too” or “Not accurate”. Tips are never treated as
-          government law. Call and Open buttons always use verified contacts.
-          You cannot validate your own tip. Tips are anonymous.
-        </Text>
-
-        <Text style={styles.section}>Public alerts</Text>
-        <Text style={styles.body}>
-          Anyone can post an anonymous photo of a danger they see (crack,
-          pothole, open drain). Others can tap “I see this too”. No names are
-          shown - even if you have a profile.
-        </Text>
-
-        <Text style={styles.section}>Your data on this phone</Text>
-        <Text style={styles.body}>
-          Alerts, tips, case notes, and an optional username profile stay on
-          this device. You can delete all of that anytime.
+        <Text style={styles.guestNote}>
+          Guests: explore, guide, view alerts. Profile (mobile + address): My
+          Cases and posting alerts. Posts are always anonymous.
         </Text>
 
         <Pressable
@@ -143,11 +132,7 @@ export default function AboutScreen({ navigation }: Props) {
           )}
         </Pressable>
 
-        <Text style={styles.meta}>Version 1.0.0</Text>
-        <Text style={styles.meta}>
-          Contact numbers and websites are checked against official government
-          sources. If something cannot be verified, we do not invent it.
-        </Text>
+        <Text style={styles.meta}>Version 1.1.1</Text>
       </ScrollView>
     </View>
   );
@@ -165,10 +150,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   logo: {
-    width: 160,
-    height: 160,
+    width: 96,
+    height: 96,
     alignSelf: "center",
-    marginBottom: 8,
+    marginBottom: 10,
+    borderRadius: 22,
   },
   title: {
     fontSize: 26,
@@ -176,20 +162,53 @@ const styles = StyleSheet.create({
     color: colors.navy,
     textAlign: "center",
   },
-  section: {
-    marginTop: 20,
-    fontSize: 16,
+  tagline: {
+    marginTop: 6,
+    marginBottom: 20,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.mutedDark,
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 14,
+    backgroundColor: colors.lightBlue,
+    borderRadius: radii.lg,
+    padding: 14,
+  },
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rowTitle: {
+    fontSize: 15,
     fontWeight: "800",
     color: colors.navy,
   },
-  body: {
-    marginTop: 10,
-    fontSize: 15,
-    lineHeight: 22,
+  rowBody: {
+    marginTop: 2,
+    fontSize: 13,
+    lineHeight: 18,
     color: colors.mutedDark,
+    fontWeight: "500",
+  },
+  guestNote: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.mutedDark,
+    fontWeight: "500",
   },
   deleteBtn: {
-    marginTop: 16,
+    marginTop: 20,
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.logoutFg,
@@ -209,6 +228,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.muted,
     fontWeight: "600",
-    lineHeight: 19,
+    textAlign: "center",
   },
 });

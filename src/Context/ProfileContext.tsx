@@ -10,36 +10,42 @@ import {
   createAccount,
   getAccount,
   getSession,
+  renameUsername,
   signIn,
   signOut,
-  updateDisplayName,
+  updateProfileFields,
+  type CreateAccountInput,
   type LocalAccount,
 } from "../lib/localAuth";
 
 export type UserProfile = {
   username: string;
   displayName: string;
+  phone: string;
+  address: string;
 };
 
 type ProfileContextValue = {
   ready: boolean;
-  /** True only when signed in with username + password. Guests are not logged in. */
   loggedIn: boolean;
   isGuest: boolean;
   profile: UserProfile | null;
   continueAsGuest: () => void;
   createProfile: (
-    username: string,
-    password: string,
-    displayName?: string
+    input: CreateAccountInput
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
   logInWithPassword: (
-    username: string,
+    login: string,
     password: string
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
   logOut: () => Promise<void>;
   setDisplayName: (displayName: string) => Promise<void>;
-  /** After wipe: clear session UI without writing storage again. */
+  updateProfile: (patch: {
+    displayName?: string;
+    phone?: string;
+    address?: string;
+    username?: string;
+  }) => Promise<{ ok: true } | { ok: false; error: string }>;
   resetToGuest: () => void;
 };
 
@@ -49,6 +55,8 @@ function toProfile(account: LocalAccount): UserProfile {
   return {
     username: account.username,
     displayName: account.displayName || account.username,
+    phone: account.phone || "",
+    address: account.address || "",
   };
 }
 
@@ -87,19 +95,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
   }, []);
 
-  const createProfile = useCallback(
-    async (username: string, password: string, displayName?: string) => {
-      const result = await createAccount(username, password, displayName);
-      if (!result.ok) return result;
-      setProfile(toProfile(result.account));
-      return { ok: true as const };
-    },
-    []
-  );
+  const createProfile = useCallback(async (input: CreateAccountInput) => {
+    const result = await createAccount(input);
+    if (!result.ok) return result;
+    setProfile(toProfile(result.account));
+    return { ok: true as const };
+  }, []);
 
   const logInWithPassword = useCallback(
-    async (username: string, password: string) => {
-      const result = await signIn(username, password);
+    async (login: string, password: string) => {
+      const result = await signIn(login, password);
       if (!result.ok) return result;
       setProfile(toProfile(result.account));
       return { ok: true as const };
@@ -115,11 +120,49 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const setDisplayName = useCallback(
     async (displayName: string) => {
       if (!profile) return;
-      await updateDisplayName(profile.username, displayName);
+      await updateProfileFields(profile.username, { displayName });
       setProfile({
-        username: profile.username,
+        ...profile,
         displayName: displayName.trim() || profile.username,
       });
+    },
+    [profile]
+  );
+
+  const updateProfile = useCallback(
+    async (patch: {
+      displayName?: string;
+      phone?: string;
+      address?: string;
+      username?: string;
+    }) => {
+      if (!profile) return { ok: false as const, error: "Not signed in." };
+      let workingUser = profile.username;
+      if (
+        patch.username !== undefined &&
+        patch.username.trim().toLowerCase() !== profile.username
+      ) {
+        const renamed = await renameUsername(profile.username, patch.username);
+        if (!renamed.ok) return renamed;
+        workingUser = renamed.account.username;
+        setProfile(toProfile(renamed.account));
+      }
+      const fieldPatch: {
+        displayName?: string;
+        phone?: string;
+        address?: string;
+      } = {};
+      if (patch.displayName !== undefined)
+        fieldPatch.displayName = patch.displayName;
+      if (patch.phone !== undefined) fieldPatch.phone = patch.phone;
+      if (patch.address !== undefined) fieldPatch.address = patch.address;
+      if (Object.keys(fieldPatch).length) {
+        const result = await updateProfileFields(workingUser, fieldPatch);
+        if (!result.ok) return result;
+      }
+      const account = await getAccount(workingUser);
+      if (account) setProfile(toProfile(account));
+      return { ok: true as const };
     },
     [profile]
   );
@@ -139,6 +182,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       logInWithPassword,
       logOut,
       setDisplayName,
+      updateProfile,
       resetToGuest,
     }),
     [
@@ -149,6 +193,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       logInWithPassword,
       logOut,
       setDisplayName,
+      updateProfile,
       resetToGuest,
     ]
   );
