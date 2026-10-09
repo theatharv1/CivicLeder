@@ -127,11 +127,29 @@ async function call<T>(path: string, init?: RequestInit): Promise<Result<T>> {
         ...(init?.headers ?? {}),
       },
     });
-    const json = (await res.json()) as
-      | { success: true; data: T }
-      | { success: false; error?: { message?: string } };
-    if (!json.success) {
-      return { ok: false, error: json.error?.message || "Something went wrong. Try again." };
+    let json: { success: true; data: T } | { success: false; error?: { message?: string } };
+    try {
+      json = (await res.json()) as typeof json;
+    } catch {
+      if (!res.ok) {
+        return {
+          ok: false,
+          error:
+            res.status === 429
+              ? "Too many requests. Wait a bit and try again."
+              : OFFLINE,
+        };
+      }
+      return { ok: false, error: OFFLINE };
+    }
+    if (!res.ok || !json.success) {
+      const msg =
+        !json.success && json.error?.message
+          ? json.error.message
+          : res.status === 429
+            ? "Too many requests. Wait a bit and try again."
+            : "Something went wrong. Try again.";
+      return { ok: false, error: msg };
     }
     return { ok: true, data: json.data };
   } catch {

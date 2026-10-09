@@ -206,8 +206,9 @@ Import remaining catalog rows from legacy SQL / seed later if needed (see `serve
 | EAS env | Set production `EXPO_PUBLIC_API_URL` |
 | Privacy URL | Live HTTPS policy page |
 | Listing copy | Guide only — not a government filing app |
-| Signing | EAS-managed or release keystore (never commit) |
-| Permissions | Match camera / photos / location copy in stores |
+| Signing | EAS-managed or release keystore (never commit). Local Gradle **must** have `android/keystore.properties` — release no longer falls back to debug. Legacy `ecoaadat-release.keystore` / alias is fine; do not regenerate a new upload key. |
+| Permissions | Match camera / photos / location-when-in-use only. No background location, contacts, or overlay. After changing `app.json` `blockedPermissions`, run `npx expo prebuild --clean` (or EAS) so native manifests refresh. |
+| Privacy / listing | Website must not claim SafeWalk, My Circle, or contacts. Public brand spelling: **CivicLeder**; package ID stays `com.civicleader.app`. |
 
 ### 7.5 Product limits to decide before scale
 
