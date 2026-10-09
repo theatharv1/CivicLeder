@@ -196,6 +196,9 @@ export function validatePublicAlertInput(input: PostPublicAlertInput): string | 
   if (photoRequiredFor(input.type) && !input.photoUri) {
     return "Add a photo so others can recognise the spot.";
   }
+  if (input.placeName.trim().length < 2) {
+    return "Add a short place name so others recognise the spot.";
+  }
   if (input.description.trim().length < 8) {
     return "Describe what you saw (at least a few words).";
   }

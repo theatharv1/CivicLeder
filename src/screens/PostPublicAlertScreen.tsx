@@ -266,6 +266,16 @@ export default function PostPublicAlertScreen({ navigation, route }: Props) {
           </Pressable>
         </View>
 
+        <Text style={styles.label}>Place name</Text>
+        <TextInput
+          style={styles.input}
+          value={placeName}
+          onChangeText={setPlaceName}
+          placeholder="e.g. Metro gate 3, near the park"
+          placeholderTextColor={colors.muted}
+          maxLength={80}
+        />
+
         <Text style={styles.label}>Description</Text>
         <TextInput
           style={[styles.input, styles.area]}
