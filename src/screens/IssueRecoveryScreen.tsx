@@ -242,7 +242,7 @@ export default function IssueRecoveryScreen({ navigation }: Props) {
                 style={styles.branchCard}
                 onPress={() => {
                   if (b.id === "follow_up") {
-                    navigation.navigate("Main", { screen: "cases" });
+                    navigation.navigate("MyCases");
                     return;
                   }
                   setBranch(b.id);

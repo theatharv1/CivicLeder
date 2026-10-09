@@ -5,10 +5,13 @@ import morgan from "morgan";
 import { config } from "./config/env.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import { apiRouter } from "./routes/api.js";
+import { publicAlertsRouter } from "./routes/publicAlerts.js";
 import { ok } from "./utils/errors.js";
 
 export function createApp() {
   const app = express();
+  // nginx on the same host forwards the client IP (used by rate limits).
+  app.set("trust proxy", "loopback");
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(
     cors({
@@ -29,6 +32,7 @@ export function createApp() {
     res.json(ok({ status: "ok" }));
   });
 
+  app.use("/api/v1/public-alerts", publicAlertsRouter);
   app.use("/api/v1", apiRouter);
   app.use(notFound);
   app.use(errorHandler);

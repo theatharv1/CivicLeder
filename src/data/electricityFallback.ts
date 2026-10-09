@@ -10,14 +10,15 @@ import type { FallbackAuthorityService } from "./dfsEmergencyFieldsFallback";
 export const FALLBACK_ELECTRICITY_ISSUE_TYPES: IssueTypeRow[] = [
   {
     slug: "electricity_no_supply",
-    name: "No electricity supply",
-    short_description: "Reported concern that power supply is not available",
+    name: "No power at home",
+    short_description:
+      "Call your DISCOM. BRPL and BYPL pages cite DERC: individual no-supply complaints should be restored within 2 hours.",
     sort_order: 1,
   },
   {
     slug: "electricity_live_wire",
     name: "Live / fallen wire",
-    short_description: "Stay away — call 112 / 101 first",
+    short_description: "Stay away. Call 112 / 101 first",
     sort_order: 2,
   },
   {
@@ -29,7 +30,7 @@ export const FALLBACK_ELECTRICITY_ISSUE_TYPES: IssueTypeRow[] = [
   {
     slug: "electricity_meter_sparking",
     name: "Meter sparking",
-    short_description: "Electrical safety — emergency if immediate danger",
+    short_description: "Electrical safety. Emergency if immediate danger",
     sort_order: 4,
   },
   {
@@ -41,7 +42,7 @@ export const FALLBACK_ELECTRICITY_ISSUE_TYPES: IssueTypeRow[] = [
   {
     slug: "electricity_power_theft_report",
     name: "Report suspected power theft",
-    short_description: "Dedicated theft channel — do not confront anyone",
+    short_description: "Dedicated theft channel. Do not confront anyone",
     sort_order: 6,
   },
   {
@@ -115,7 +116,7 @@ export const FALLBACK_ELECTRICITY_ROUTING: RoutedAuthority[] = [
     slug: "brpl",
     name: "BSES Rajdhani Power Limited (BRPL)",
     short_description:
-      "Candidate DISCOM for BRPL areas. Confirm from bill — GPS does not prove provider.",
+      "Candidate DISCOM for BRPL areas. Confirm from bill. GPS does not prove provider.",
     official_website: "https://www.bsesdelhi.com/web/brpl",
     emergency_number: "011-49516707",
     confidence: "needs_confirmation",
@@ -186,7 +187,7 @@ export const FALLBACK_ELECTRICITY_ROUTING: RoutedAuthority[] = [
     slug: "bypl",
     name: "BSES Yamuna Power Limited (BYPL)",
     short_description:
-      "Candidate DISCOM for BYPL areas. Confirm from bill — GPS does not prove provider.",
+      "Candidate DISCOM for BYPL areas. Confirm from bill. GPS does not prove provider.",
     official_website: "https://www.bsesdelhi.com/web/bypl",
     emergency_number: null,
     confidence: "needs_confirmation",
@@ -223,6 +224,13 @@ export const FALLBACK_ELECTRICITY_ROUTING: RoutedAuthority[] = [
         purpose: "email",
       }),
       ch({
+        channel_type: "whatsapp",
+        label: "BYPL WhatsApp",
+        value: "8745999808",
+        whatsapp: "8745999808",
+        purpose: "whatsapp",
+      }),
+      ch({
         channel_type: "portal",
         label: "BYPL report power theft",
         value: "https://www.bsesdelhi.com/web/bypl/report-power-theft",
@@ -244,7 +252,7 @@ export const FALLBACK_ELECTRICITY_ROUTING: RoutedAuthority[] = [
     slug: "tpddl",
     name: "Tata Power-DDL (TPDDL)",
     short_description:
-      "Candidate DISCOM for TPDDL areas. Confirm from bill — GPS does not prove provider.",
+      "Candidate DISCOM for TPDDL areas. Confirm from bill. GPS does not prove provider.",
     official_website: "https://www.tatapower-ddl.com/",
     emergency_number: "19124",
     confidence: "needs_confirmation",
@@ -331,9 +339,9 @@ export const FALLBACK_ELECTRICITY_ROUTING: RoutedAuthority[] = [
       }),
       ch({
         channel_type: "phone",
-        label: "NDMC electricity helpline (prior seed — confirm NDMC area)",
-        value: "19121",
-        phone: "19121",
+        label: "NDMC toll-free complaints (1533)",
+        value: "1533",
+        phone: "1533",
         purpose: "general_customer_care",
       }),
       ch({

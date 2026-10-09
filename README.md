@@ -32,7 +32,7 @@ Or open `website/index.html` in a browser.
 
 - Name: CivicLeder
 - Tagline: Know · Act · A Better City
-- Support: hello@civicleader.app
+- Support: civicleder@gmail.com
 
 ## Backend
 

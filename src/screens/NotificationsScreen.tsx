@@ -1,28 +1,33 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ArrowLeft } from "lucide-react-native";
+import { listLocalCases, type LocalCaseRecord } from "../lib/myCases";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, radii, space } from "../theme/tokens";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Notifications">;
 
-const ITEMS = [
-  {
-    title: "Garbage Overflow update",
-    body: "Your report is marked In Progress by the local office.",
-    time: "2h ago",
-  },
-  {
-    title: "Street light complaint",
-    body: "Action in progress near Vishwavidyalaya Metro Gate.",
-    time: "1d ago",
-  },
-];
+function categoryLabel(row: LocalCaseRecord): string {
+  const cat = row.categorySlug?.replace(/_/g, " ")?.trim();
+  return cat && cat.length > 0 ? cat : "Other";
+}
 
 export default function NotificationsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const [cases, setCases] = useState<LocalCaseRecord[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void listLocalCases().then(setCases);
+    }, [])
+  );
+
+  const withRef = cases.filter((c) => c.officialReference?.trim());
+  const withoutRef = cases.filter((c) => !c.officialReference?.trim());
+
   return (
     <View style={styles.root}>
       <ScrollView
@@ -36,13 +41,51 @@ export default function NotificationsScreen({ navigation }: Props) {
           <ArrowLeft size={22} color={colors.navy} />
         </Pressable>
         <Text style={styles.title}>Notifications</Text>
-        {ITEMS.map((item) => (
-          <View key={item.title} style={styles.card}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardBody}>{item.body}</Text>
-            <Text style={styles.time}>{item.time}</Text>
+        <Text style={styles.lead}>
+          Your saved complaint references. Add or edit them in My Cases.
+        </Text>
+
+        {cases.length === 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>No cases yet</Text>
+            <Text style={styles.cardBody}>
+              When you save a government complaint reference, it shows here.
+            </Text>
           </View>
-        ))}
+        ) : (
+          <>
+            {withRef.map((item) => (
+              <Pressable
+                key={item.caseId}
+                style={styles.card}
+                onPress={() => navigation.navigate("MyCases")}
+              >
+                <Text style={styles.badge}>Filed</Text>
+                <Text style={styles.cardTitle}>
+                  Ref: {item.officialReference}
+                </Text>
+                <Text style={styles.cardBody}>
+                  Category: {categoryLabel(item)}
+                  {item.authorityName ? ` · ${item.authorityName}` : ""}
+                </Text>
+              </Pressable>
+            ))}
+            {withoutRef.map((item) => (
+              <Pressable
+                key={item.caseId}
+                style={styles.card}
+                onPress={() => navigation.navigate("MyCases")}
+              >
+                <Text style={styles.badgeMuted}>No reference yet</Text>
+                <Text style={styles.cardTitle}>{item.caseId}</Text>
+                <Text style={styles.cardBody}>
+                  Category: {categoryLabel(item)}. Add the government complaint
+                  number in My Cases.
+                </Text>
+              </Pressable>
+            ))}
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -63,13 +106,44 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     color: colors.navy,
+    marginBottom: 6,
+  },
+  lead: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.mutedDark,
     marginBottom: 16,
+    fontWeight: "500",
   },
   card: {
     backgroundColor: colors.lightBlue,
     borderRadius: radii.lg,
     padding: 14,
     marginBottom: 10,
+  },
+  badge: {
+    alignSelf: "flex-start",
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.statusGreenFg,
+    backgroundColor: colors.statusGreenBg,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  badgeMuted: {
+    alignSelf: "flex-start",
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.mutedDark,
+    backgroundColor: colors.statusMutedBg,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    overflow: "hidden",
+    marginBottom: 6,
   },
   cardTitle: {
     fontSize: 15,
@@ -81,11 +155,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: colors.mutedDark,
-  },
-  time: {
-    marginTop: 8,
-    fontSize: 11,
-    color: colors.muted,
-    fontWeight: "600",
   },
 });

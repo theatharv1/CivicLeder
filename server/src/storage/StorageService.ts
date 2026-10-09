@@ -28,8 +28,18 @@ export class LocalStorageProvider implements StorageProvider {
     await fs.writeFile(full, data);
     return { storagePath: safe };
   }
+
+  /** Absolute path for a stored file, or null if it would escape the root. */
+  resolve(relativePath: string): string | null {
+    const full = path.resolve(this.root, relativePath);
+    return full.startsWith(this.root + path.sep) ? full : null;
+  }
 }
 
 export function createStorage(): StorageProvider {
   return new LocalStorageProvider();
+}
+
+export function createPublicAlertStorage(): LocalStorageProvider {
+  return new LocalStorageProvider(path.join(config.storagePath, "public-alerts"));
 }

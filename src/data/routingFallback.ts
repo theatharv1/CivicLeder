@@ -306,6 +306,8 @@ export const FALLBACK_CONSTRUCTION_ROUTING: RoutedAuthority[] = [
         value: "https://mcdonline.nic.in/",
         action_url:
           "https://mcd.everythingcivic.com/citizen/createissue?app_id=U2FsdGVkX180J3mGnJmT5QpgtPjhfjtzyXAAccBUxGU%3D&api_key=e34ba86d3943bd6db9120313da011937189e6a9625170905750f649395bcd68312cf10d264c9305d57c23688cc2e5120",
+        tracking_url:
+          "https://mcd.everythingcivic.com/citizen/issuedetail?app_id=U2FsdGVkX180J3mGnJmT5QpgtPjhfjtzyXAAccBUxGU%3D&api_key=e34ba86d3943bd6db9120313da011937189e6a9625170905750f649395bcd68312cf10d264c9305d57c23688cc2e5120",
       },
     ],
   },

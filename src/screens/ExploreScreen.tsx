@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
-  Image,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,13 +17,14 @@ import {
   MapPin,
   Megaphone,
   Search,
-  ThumbsUp,
   X,
+  ArrowLeft,
 } from "lucide-react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Linking } from "react-native";
 import LocationPickerModal from "../components/LocationPickerModal";
+import PublicAlertCard from "../components/PublicAlertCard";
 import { useAppLocation } from "../Context/LocationContext";
 import {
   LEARN_CARDS,
@@ -33,8 +33,8 @@ import {
 } from "../data/exploreLearn";
 import type { ReportCategoryId } from "../data/reportCategories";
 import {
+  alertTypeInfo,
   listPublicAlerts,
-  verifyPublicAlert,
   type PublicAlert,
 } from "../lib/publicAlerts";
 import type { RootStackParamList } from "../navigation/types";
@@ -51,16 +51,6 @@ function learnToReportSlug(cat: LearnCategory): ReportCategoryId | null {
   if (cat === "street") return "roads_public";
   if (cat === "animals") return "animals";
   return null;
-}
-
-function timeAgo(iso: string): string {
-  const ms = Date.now() - Date.parse(iso);
-  const m = Math.floor(ms / 60000);
-  if (m < 1) return "Just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
 }
 
 function GuideRow({ card }: { card: LearnCard }) {
@@ -114,19 +104,36 @@ function GuideRow({ card }: { card: LearnCard }) {
   );
 }
 
-export default function ExploreScreen() {
+export default function ExploreScreen({
+  onBackHome,
+}: {
+  onBackHome?: () => void;
+}) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
-  const { location, setLocation } = useAppLocation();
+  const { location, setLocation, locationLabel, gps } = useAppLocation();
   const [mode, setMode] = useState<Mode>("alerts");
   const [query, setQuery] = useState("");
   const [locationOpen, setLocationOpen] = useState(false);
   const [alerts, setAlerts] = useState<PublicAlert[]>([]);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const nearKey = gps ? `${gps.latitude.toFixed(3)},${gps.longitude.toFixed(3)}` : "none";
 
   const refresh = useCallback(async () => {
-    setAlerts(await listPublicAlerts());
-  }, []);
+    setLoading(true);
+    const result = await listPublicAlerts(
+      gps ? { latitude: gps.latitude, longitude: gps.longitude } : null
+    );
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setError(null);
+    setAlerts(result.data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -140,7 +147,8 @@ export default function ExploreScreen() {
     return alerts.filter(
       (a) =>
         a.placeName.toLowerCase().includes(q) ||
-        a.description.toLowerCase().includes(q)
+        a.description.toLowerCase().includes(q) ||
+        alertTypeInfo(a.type).label.toLowerCase().includes(q)
     );
   }, [alerts, query]);
 
@@ -155,17 +163,18 @@ export default function ExploreScreen() {
     );
   }, [query]);
 
-  const onVerify = async (id: string) => {
-    setBusyId(id);
-    const result = await verifyPublicAlert(id);
-    setBusyId(null);
-    if (!result.ok) {
-      Alert.alert("Could not verify", result.error);
-      return;
-    }
+  const onAlertChanged = (id: string, next: PublicAlert | null) => {
     setAlerts((prev) =>
-      prev.map((a) => (a.id === result.alert.id ? { ...a, ...result.alert } : a))
+      next ? prev.map((a) => (a.id === id ? next : a)) : prev.filter((a) => a.id !== id)
     );
+  };
+
+  const openReport = (category: ReportCategoryId) => {
+    navigation.navigate({
+      name: "ReportStep2",
+      params: { category },
+      merge: false,
+    });
   };
 
   return (
@@ -181,11 +190,21 @@ export default function ExploreScreen() {
       >
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
+            {onBackHome ? (
+              <Pressable
+                onPress={onBackHome}
+                style={styles.back}
+                accessibilityRole="button"
+                accessibilityLabel="Back"
+              >
+                <ArrowLeft size={22} color={colors.navy} strokeWidth={2.2} />
+              </Pressable>
+            ) : null}
             <Text style={styles.title}>Explore</Text>
             <Text style={styles.sub}>
               {mode === "alerts"
-                ? "What people nearby posted. Real posts only."
-                : "Open a guide only if you want to read more."}
+                ? "Nearby posts. Always anonymous."
+                : "Guides when you want to read more."}
             </Text>
           </View>
           <Pressable
@@ -193,7 +212,9 @@ export default function ExploreScreen() {
             onPress={() => setLocationOpen(true)}
           >
             <MapPin size={14} color={colors.primaryBlue} strokeWidth={2.4} />
-            <Text style={styles.locationText}>{location}</Text>
+            <Text style={styles.locationText} numberOfLines={1}>
+              {locationLabel}
+            </Text>
             <ChevronDown
               size={14}
               color={colors.primaryBlue}
@@ -268,76 +289,38 @@ export default function ExploreScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.postTitle}>Post an alert</Text>
                 <Text style={styles.postSub}>
-                  Photo and place. Anonymous. Takes under a minute.
+                  Place and what you saw. Anonymous. Takes under a minute.
                 </Text>
               </View>
               <ChevronRight size={18} color={colors.linkBlue} />
             </Pressable>
 
-            {filteredAlerts.length === 0 ? (
+            {loading && alerts.length === 0 ? (
+              <ActivityIndicator color={colors.primaryBlue} style={{ marginVertical: 16 }} />
+            ) : error && alerts.length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyTitle}>No posts yet</Text>
+                <Text style={styles.emptyTitle}>Couldn't load alerts</Text>
+                <Text style={styles.emptyBody}>{error}</Text>
+                <Pressable onPress={() => void refresh()} hitSlop={8}>
+                  <Text style={styles.linkText}>Try again</Text>
+                </Pressable>
+              </View>
+            ) : filteredAlerts.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyTitle}>No alerts near you</Text>
                 <Text style={styles.emptyBody}>
-                  When someone posts a public alert, it will show up here. No
-                  sample posts.
+                  When someone nearby posts a public alert, it shows up here
+                  for everyone. No sample posts.
                 </Text>
               </View>
             ) : (
               filteredAlerts.map((alert) => (
-                <View key={alert.id} style={styles.alertCard}>
-                  {alert.photoUri ? (
-                    <Image
-                      source={{ uri: alert.photoUri }}
-                      style={styles.alertPhoto}
-                    />
-                  ) : null}
-                  <View style={styles.alertBody}>
-                    <Text style={styles.alertPlace}>{alert.placeName}</Text>
-                    <Text style={styles.alertDesc}>{alert.description}</Text>
-                    <Text style={styles.alertMeta}>
-                      {timeAgo(alert.createdAt)}
-                      {alert.areaLabel ? ` · ${alert.areaLabel}` : ""}
-                      {alert.nearbyCount
-                        ? ` · ${alert.nearbyCount + 1} near this spot`
-                        : ""}
-                      {" · Anonymous"}
-                    </Text>
-                    <View style={styles.alertActions}>
-                      <Text style={styles.verifyCount}>
-                        {alert.verifyCount} verified
-                      </Text>
-                      {!alert.isMine ? (
-                        <Pressable
-                          style={[
-                            styles.verifyBtn,
-                            alert.myVerified && styles.verifyBtnOn,
-                          ]}
-                          disabled={busyId === alert.id || alert.myVerified}
-                          onPress={() => void onVerify(alert.id)}
-                        >
-                          <ThumbsUp
-                            size={14}
-                            color={
-                              alert.myVerified
-                                ? colors.white
-                                : colors.primaryBlue
-                            }
-                          />
-                          <Text
-                            style={[
-                              styles.verifyBtnText,
-                              alert.myVerified && styles.verifyBtnTextOn,
-                            ]}
-                          >
-                            {alert.myVerified ? "Verified" : "I see this too"}
-                          </Text>
-                        </Pressable>
-                      ) : (
-                        <Text style={styles.mineNote}>Your post</Text>
-                      )}
-                    </View>
-                  </View>
-                </View>
+                <PublicAlertCard
+                  key={alert.id}
+                  alert={alert}
+                  onChanged={(next) => onAlertChanged(alert.id, next)}
+                  onReport={openReport}
+                />
               ))
             )}
           </>
@@ -376,6 +359,15 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   title: { fontSize: 28, fontWeight: "800", color: colors.navy },
+  back: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.lightBlue,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
   sub: {
     marginTop: 4,
     fontSize: 13,
@@ -459,49 +451,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   emptyBody: { fontSize: 13, lineHeight: 19, color: colors.mutedDark },
-  alertCard: {
-    backgroundColor: colors.white,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    overflow: "hidden",
-    marginBottom: 12,
-  },
-  alertPhoto: { width: "100%", height: 150, backgroundColor: colors.canvas },
-  alertBody: { padding: 12 },
-  alertPlace: { fontSize: 15, fontWeight: "800", color: colors.navy },
-  alertDesc: {
-    marginTop: 4,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.mutedDark,
-  },
-  alertMeta: {
-    marginTop: 8,
-    fontSize: 11,
-    color: colors.muted,
-    fontWeight: "600",
-  },
-  alertActions: {
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  verifyCount: { fontSize: 12, fontWeight: "700", color: colors.navy },
-  verifyBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radii.pill,
-    backgroundColor: colors.lightBlue,
-  },
-  verifyBtnOn: { backgroundColor: colors.primaryBlue },
-  verifyBtnText: { fontSize: 12, fontWeight: "700", color: colors.primaryBlue },
-  verifyBtnTextOn: { color: colors.white },
-  mineNote: { fontSize: 12, fontWeight: "600", color: colors.muted },
   guidesHint: {
     fontSize: 13,
     color: colors.mutedDark,

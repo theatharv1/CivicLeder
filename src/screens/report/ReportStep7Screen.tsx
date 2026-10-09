@@ -21,16 +21,20 @@ import {
   ExternalLink,
   Globe,
   MapPin,
+  Megaphone,
   Phone,
 } from "lucide-react-native";
 import LocationPickerModal from "../../components/LocationPickerModal";
 import StepProgress from "../../components/StepProgress";
-import { reportPhase } from "../../lib/reportPhase";
+import { useProfile } from "../../Context/ProfileContext";
 import { useAppLocation } from "../../Context/LocationContext";
 import {
   formatIncidentLocationSummary,
   useReportDraft,
 } from "../../Context/ReportDraftContext";
+import { reportPhase } from "../../lib/reportPhase";
+import { requireAccount } from "../../lib/requireAccount";
+import { resolveIssueLabel } from "../../lib/issueLabel";
 import { DFS_COMPLAINT_URL } from "../../data/dfsEmergencyFieldsFallback";
 import {
   isBuildingApprovalIssue,
@@ -155,7 +159,8 @@ function buildingApprovalLabel(slug: string | null | undefined): string {
 
 export default function ReportStep7Screen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { location, setLocation } = useAppLocation();
+  const { loggedIn } = useProfile();
+  const { location, setLocation, locationLabel } = useAppLocation();
   const {
     categoryId,
     issueTypeSlug,
@@ -191,6 +196,7 @@ export default function ReportStep7Screen({ navigation }: Props) {
   const [editingDescription, setEditingDescription] = useState(false);
   const [showEscalation, setShowEscalation] = useState(false);
   const [showMoreContacts, setShowMoreContacts] = useState(false);
+  const [websiteDraft, setWebsiteDraft] = useState("");
 
   const category = REPORT_CATEGORIES.find((c) => c.id === categoryId);
   const isFire = categoryId === "fire_safety";
@@ -257,58 +263,7 @@ export default function ReportStep7Screen({ navigation }: Props) {
   const roadsPurpose = roadsChannelPurpose(issueTypeSlug);
   const environmentPurpose = environmentChannelPurpose(issueTypeSlug);
 
-  const issueLabel = useMemo(() => {
-    if (isAnimals) {
-      return (
-        animalsGroupForIssueSlug(issueTypeSlug)?.label ??
-        (issueTypeSlug ? issueTypeSlug.replace(/_/g, " ") : null) ??
-        category?.description ??
-        "Reported concern"
-      );
-    }
-    if (isEnvironment) {
-      return (
-        environmentGroupForIssueSlug(issueTypeSlug)?.label ??
-        (issueTypeSlug ? issueTypeSlug.replace(/_/g, " ") : null) ??
-        category?.description ??
-        "Reported concern"
-      );
-    }
-    if (isRoadsPublic) {
-      return (
-        roadsGroupForIssueSlug(issueTypeSlug)?.label ??
-        (issueTypeSlug ? issueTypeSlug.replace(/_/g, " ") : null) ??
-        category?.description ??
-        "Reported concern"
-      );
-    }
-    if (isWasteGarbage) {
-      return (
-        wasteGroupForIssueSlug(issueTypeSlug)?.label ??
-        (issueTypeSlug ? issueTypeSlug.replace(/_/g, " ") : null) ??
-        category?.description ??
-        "Reported concern"
-      );
-    }
-    if (isWaterDrainage) {
-      return (
-        waterGroupForIssueSlug(issueTypeSlug)?.label ??
-        (issueTypeSlug ? issueTypeSlug.replace(/_/g, " ") : null) ??
-        category?.description ??
-        "Reported concern"
-      );
-    }
-    if (issueTypeSlug) return issueTypeSlug.replace(/_/g, " ");
-    return category?.description ?? "Reported concern";
-  }, [
-    issueTypeSlug,
-    category?.description,
-    isWaterDrainage,
-    isWasteGarbage,
-    isRoadsPublic,
-    isEnvironment,
-    isAnimals,
-  ]);
+  const issueLabel = resolveIssueLabel(categoryId, issueTypeSlug);
 
   const incidentSummary = formatIncidentLocationSummary(locationDraft);
 
@@ -714,6 +669,13 @@ export default function ReportStep7Screen({ navigation }: Props) {
     authority?.official_website ??
     (isFire ? DFS_COMPLAINT_URL : null);
 
+  useEffect(() => {
+    // Seed tracking field with status URL only — never createissue / filing.
+    const seed = trackingUrl || "";
+    if (seed && !websiteDraft) setWebsiteDraft(seed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once when channels load
+  }, [trackingUrl]);
+
   const needFields = useMemo(() => {
     const fromService = (service?.fields ?? []).filter(
       (f) =>
@@ -828,24 +790,34 @@ export default function ReportStep7Screen({ navigation }: Props) {
   };
 
   const saveFiling = async () => {
-    if (userConfirmedFiled !== true) return;
+    if (
+      !requireAccount(
+        navigation,
+        "Create a profile to save tracking IDs in My Cases.",
+        loggedIn
+      )
+    ) {
+      return;
+    }
+    setUserConfirmedFiled(true);
     setSaving(true);
     try {
       const hasRef = Boolean(officialReference?.trim());
       setHasOfficialReference(hasRef);
-      // Status is always user-recorded - never a government sync status
       const status = hasRef ? "reference_recorded" : "recorded";
       const dbId = await ensureReportSaved(status);
+      const savedTracking =
+        websiteDraft.trim() || trackingUrl || null;
       const channelType = isEmergency
         ? "phone"
-        : filingUrl
+        : savedTracking
           ? "website"
           : phone
             ? "phone"
             : null;
       const channelValue = isEmergency
         ? phone ?? "101"
-        : (filingUrl ?? phone ?? officialPage);
+        : (savedTracking ?? phone ?? officialPage);
       await persistOfficialComplaint({
         reportId: dbId,
         authoritySlug: authority?.slug ?? selectedAuthority?.slug ?? null,
@@ -853,7 +825,7 @@ export default function ReportStep7Screen({ navigation }: Props) {
         channelType,
         channelValue,
         officialSubmissionUrl: filingUrl,
-        officialTrackingUrl: trackingUrl,
+        officialTrackingUrl: savedTracking,
         hasOfficialReference: hasRef,
         officialReference: hasRef ? officialReference!.trim() : null,
         userConfirmedFiled: true,
@@ -877,15 +849,15 @@ export default function ReportStep7Screen({ navigation }: Props) {
           officialReference: hasRef ? officialReference!.trim() : null,
           filedAt: officialFiledOn || todayISODate(),
           userStatus: status,
-          trackingUrl,
+          trackingUrl: savedTracking,
           phone,
         });
       }
       setDone(true);
-      Alert.alert(
-        `Saved in ${APP_NAME}`,
-        `Notebook ID ${caseId} saved for you. This is NOT a government complaint number. Add their reference later if they gave you one.`
-      );
+      Alert.alert(`Saved`, "Tracking details saved in My Cases.", [
+        { text: "OK" },
+        { text: "Open My Cases", onPress: finish },
+      ]);
     } finally {
       setSaving(false);
     }
@@ -921,8 +893,17 @@ export default function ReportStep7Screen({ navigation }: Props) {
   };
 
   const finish = () => {
+    if (
+      !requireAccount(
+        navigation,
+        "Create a profile to open My Cases and keep tracking IDs.",
+        loggedIn
+      )
+    ) {
+      return;
+    }
     reset();
-    navigation.navigate("Main", { screen: "cases" });
+    navigation.navigate("MyCases");
   };
 
   const infoEmpty = (label: string) => (
@@ -946,7 +927,7 @@ export default function ReportStep7Screen({ navigation }: Props) {
         >
           <MapPin size={13} color={colors.primaryBlue} strokeWidth={2.4} />
           <Text style={styles.locationText} numberOfLines={1}>
-            {location}
+            {locationLabel}
           </Text>
           <ChevronDown size={13} color={colors.primaryBlue} strokeWidth={2.4} />
         </Pressable>
@@ -967,61 +948,14 @@ export default function ReportStep7Screen({ navigation }: Props) {
           />
         </View>
 
-        <View
-          style={{
-            backgroundColor: "#EEF4FF",
-            borderRadius: 12,
-            padding: 12,
-            marginBottom: 14,
-            borderWidth: 1,
-            borderColor: "#D0DFF5",
-          }}
-        >
-          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.navy }}>
-            How contact works
-          </Text>
-          <Text
-            style={{
-              marginTop: 4,
-              fontSize: 13,
-              lineHeight: 19,
-              color: colors.mutedDark,
-            }}
-          >
-            {treatAsEmergency
-              ? "Danger first: call the emergency number below. Ordinary complaint pages come after you are safe."
-              : "We show the most likely office and one main way to reach them. Extra phones or links stay under “More options” if you need them."}{" "}
-            You file on their system. Save a personal note in My Cases - that ID
-            is only for you, not a government complaint number.
-          </Text>
-        </View>
-
-        {isFire ? (
-          <>
-            <Text style={styles.heading}>
-              {isEmergency
-                ? "If danger - call Fire & Rescue"
-                : "Contact Delhi Fire Service"}
-            </Text>
-            <Text style={styles.sub}>
-              Use the main button for your need. Opening a website does not
-              mean a complaint is filed.
-            </Text>
-          </>
-        ) : (
-          <>
-            <Text style={styles.heading}>
-              {treatAsEmergency
-                ? "If danger - call emergency first"
-                : "Contact the most likely office"}
-            </Text>
-            <Text style={styles.sub}>
-              {treatAsEmergency
-                ? "Emergency numbers first. Other helplines are secondary."
-                : "Call or open their official page for this kind of issue. Then you can save what you did in My Cases."}
-            </Text>
-          </>
-        )}
+        <Text style={styles.heading}>
+          {treatAsEmergency || (isFire && isEmergency)
+            ? "Call emergency first"
+            : "Contact the office"}
+        </Text>
+        <Text style={styles.sub}>
+          You file on their system. Save the tracking ID in My Cases after.
+        </Text>
 
         {loading ? (
           <ActivityIndicator
@@ -1049,19 +983,7 @@ export default function ReportStep7Screen({ navigation }: Props) {
               <Text style={styles.desc}>{issueLabel}</Text>
               {isEmergency || treatAsEmergency ? (
                 <Text style={styles.emergencyNote}>
-                  {isRoadsPublic
-                    ? "Roads emergency - call 112 / 101 now. Do not stand in traffic or approach open manholes. Traffic Police 1095 may help for dangerous signals after emergency response. Do not use ordinary pothole channels first."
-                    : isWasteGarbage
-                    ? "Waste emergency - call 112 / 101 now. Do not approach fire, hazardous or biomedical waste. DPCC burning WhatsApp / Green Delhi are secondary after safety. Do not use ordinary collection channels first."
-                    : isWaterDrainage
-                    ? "Water emergency - call 112 / 101 / 102 now. Do not enter floodwater or approach open manholes. Use I&FC waterlogging helpline after emergency response if relevant. Do not use ordinary billing/supply channels first."
-                    : isElectricity
-                      ? "Electrical emergency - call 112 / 101 now. Stay away from wires. Use DISCOM emergency only if verified for your provider. Do not use billing/no-supply channels first."
-                      : isBuilding
-                        ? "Emergency path - call 112 / 101 now. Do not use normal complaint channels first."
-                        : isConstruction
-                          ? "Emergency path - call 112 / 101 now. Do not enter the construction site. Do not use normal complaint channels first."
-                          : "Emergency path - call Fire & Rescue 101 now."}
+                  Danger now. Call 112 / 101 first.
                 </Text>
               ) : null}
             </View>
@@ -1075,10 +997,7 @@ export default function ReportStep7Screen({ navigation }: Props) {
                       selectedAuthority?.name ??
                       "Not yet determined"}
                   </Text>
-                  <Text style={styles.desc}>
-                    Suggestion for this issue - not a guarantee. You choose
-                    whether to contact them.
-                  </Text>
+                  <Text style={styles.desc}>Suggestion. You choose.</Text>
                 </View>
                 {isElectricity || isWaterDrainage || isWasteGarbage || isRoadsPublic || isEnvironment ? (
                   <View style={styles.channelCard}>
@@ -1219,137 +1138,26 @@ export default function ReportStep7Screen({ navigation }: Props) {
               </View>
             )}
 
-            {/* Your information - optional empty states OK */}
-            <View style={styles.card}>
-              <Text style={styles.label}>Your information</Text>
-
-              <Text style={styles.infoSub}>Location</Text>
-              {incidentSummary ? (
-                <>
-                  <Text style={styles.desc}>{incidentSummary}</Text>
-                  <Pressable
-                    style={styles.copyRow}
-                    onPress={() =>
-                      navigation.navigate("ReportStep5")
-                    }
-                  >
-                    <Text style={styles.copyText}>Edit location</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.copyRow}
-                    onPress={() => void copyText("Location", incidentSummary)}
-                  >
-                    <Copy size={14} color={colors.primaryBlue} />
-                    <Text style={styles.copyText}>Copy location</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  {infoEmpty("No location added (optional)")}
-                  <Pressable
-                    style={styles.copyRow}
-                    onPress={() => navigation.navigate("ReportStep5")}
-                  >
-                    <Text style={styles.copyText}>Add / edit location</Text>
-                  </Pressable>
-                </>
-              )}
-
-              <Text style={[styles.infoSub, { marginTop: 14 }]}>Evidence</Text>
-              {evidence.length > 0 ? (
-                <>
-                  <Text style={styles.desc}>
-                    {evidence.length} item
-                    {evidence.length === 1 ? "" : "s"} in your pack
-                  </Text>
-                  <Pressable
-                    style={styles.copyRow}
-                    onPress={() => navigation.navigate("ReportStep4")}
-                  >
-                    <Text style={styles.copyText}>View / edit evidence</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  {infoEmpty("No photos or videos (optional)")}
-                  <Pressable
-                    style={styles.copyRow}
-                    onPress={() => navigation.navigate("ReportStep4")}
-                  >
-                    <Text style={styles.copyText}>Add evidence</Text>
-                  </Pressable>
-                </>
-              )}
-
-              <Text style={[styles.infoSub, { marginTop: 14 }]}>
-                Description
-              </Text>
-              {editingDescription ? (
-                <TextInput
-                  style={styles.descInput}
-                  multiline
-                  value={preparedDescription || builtDescription}
-                  onChangeText={setPreparedDescription}
-                  onBlur={() => setEditingDescription(false)}
-                />
-              ) : (
-                <Text style={styles.desc}>
-                  {preparedDescription || builtDescription || "No description yet"}
+            {(preparedDescription || builtDescription) ? (
+              <View style={styles.card}>
+                <Text style={styles.label}>Notes for you</Text>
+                <Text style={styles.desc} numberOfLines={4}>
+                  {preparedDescription || builtDescription}
                 </Text>
-              )}
-              <Pressable
-                style={styles.copyRow}
-                onPress={() => setEditingDescription(true)}
-              >
-                <Text style={styles.copyText}>Edit description</Text>
-              </Pressable>
-              {(preparedDescription || builtDescription) ? (
                 <Pressable
                   style={styles.copyRow}
                   onPress={() =>
                     void copyText(
-                      "Prepared description",
+                      "Notes",
                       preparedDescription || builtDescription
                     )
                   }
                 >
                   <Copy size={14} color={colors.primaryBlue} />
-                  <Text style={styles.copyText}>Copy description</Text>
+                  <Text style={styles.copyText}>Copy</Text>
                 </Pressable>
-              ) : null}
-            </View>
-
-            {/* What you may need */}
-            {needFields.length > 0 ? (
-              <View style={styles.card}>
-                <Text style={styles.label}>What you may need</Text>
-                <Text style={styles.desc}>
-                  From official DFS guidance - recommended. Not an invented
-                  required checklist.
-                </Text>
-                {needFields.map((f) => (
-                  <Text key={f.field_key} style={styles.fieldLine}>
-                    • {f.label}
-                    {f.requiredness === "may_be_requested"
-                      ? " (may be requested)"
-                      : " (recommended)"}
-                  </Text>
-                ))}
               </View>
             ) : null}
-
-            <View style={styles.warnCard}>
-              <AlertTriangle
-                size={18}
-                color={colors.emergency}
-                strokeWidth={2.2}
-              />
-              <Text style={styles.warnText}>
-                Official sites may ask for login or OTP - we cannot skip those.
-                Your {APP_CASE_ID_LABEL} is only a personal notebook number, not
-                a government complaint ID.
-              </Text>
-            </View>
 
             {/* Official channel */}
             <View style={styles.channelCard}>
@@ -1408,9 +1216,7 @@ export default function ReportStep7Screen({ navigation }: Props) {
                 <Text style={styles.label}>Your {APP_CASE_ID_LABEL}</Text>
                 <Text style={styles.caseId}>{caseId}</Text>
                 <Text style={styles.desc}>
-                  For your notebook only (like case 1, 2, 3 on your phone). Not
-                  a government complaint number. If the office gives you their
-                  own reference, you can type it in when you save.
+                  Personal note ID only. Not a government complaint number.
                 </Text>
               </View>
             ) : null}
@@ -2175,205 +1981,66 @@ export default function ReportStep7Screen({ navigation }: Props) {
               </Pressable>
             ) : null}
 
-            {/* After return - does NOT auto-mark filed on URL open */}
-            {(openedChannel || userConfirmedFiled != null || caseId) && (
-              <View style={styles.refBox}>
-                <Text style={styles.refTitle}>
-                  Save this in your notebook?
-                </Text>
-                <Text style={styles.desc}>
-                  {APP_NAME} only stores your guide notes. It does not create a
-                  government complaint. If you already filed and got their
-                  number, you can add it below for yourself.
-                </Text>
-                <View style={styles.refRow}>
-                  <Pressable
-                    style={[
-                      styles.refChip,
-                      userConfirmedFiled === true && styles.refChipOn,
-                    ]}
-                    onPress={() => {
-                      setUserConfirmedFiled(true);
-                      if (!officialFiledOn) setOfficialFiledOn(todayISODate());
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.refChipText,
-                        userConfirmedFiled === true && styles.refChipTextOn,
-                      ]}
-                    >
-                      I contacted them
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.refChip,
-                      userConfirmedFiled === false && styles.refChipOn,
-                    ]}
-                    onPress={() => {
-                      setUserConfirmedFiled(false);
-                      setOfficialReference(null);
-                      setHasOfficialReference(null);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.refChipText,
-                        userConfirmedFiled === false && styles.refChipTextOn,
-                      ]}
-                    >
-                      Just save notes
-                    </Text>
-                  </Pressable>
-                </View>
-
-                {userConfirmedFiled === true ? (
-                  <>
-                    <Text style={styles.desc}>
-                      Optional: paste the reference the office gave you. Leave
-                      blank if they did not give one.
-                    </Text>
-                    <TextInput
-                      style={styles.refInput}
-                      placeholder="Their reference (optional - yours to keep)"
-                      placeholderTextColor={colors.muted}
-                      value={officialReference ?? ""}
-                      onChangeText={setOfficialReference}
-                      autoCapitalize="characters"
-                    />
-                    <TextInput
-                      style={styles.refInput}
-                      placeholder="Date you contacted (YYYY-MM-DD, optional)"
-                      placeholderTextColor={colors.muted}
-                      value={officialFiledOn ?? ""}
-                      onChangeText={setOfficialFiledOn}
-                    />
-                    <Pressable
-                      style={styles.continue}
-                      disabled={saving}
-                      onPress={() => void saveFiling()}
-                    >
-                      {saving ? (
-                        <ActivityIndicator color={colors.white} />
-                      ) : (
-                        <Text style={styles.continueText}>
-                          Save to My Cases
-                        </Text>
-                      )}
-                    </Pressable>
-                  </>
-                ) : userConfirmedFiled === false ? (
-                  <Pressable
-                    style={styles.secondaryBtn}
-                    disabled={saving}
-                    onPress={() => void saveRecordedOnly()}
-                  >
-                    <Text style={styles.secondaryBtnText}>
-                      Save notes in My Cases
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            )}
-
-            {!openedChannel && userConfirmedFiled == null ? (
+            <View style={styles.refBox}>
+              <Text style={styles.refTitle}>Save to My Cases</Text>
+              <Text style={styles.desc}>
+                Keep the government tracking ID and website where you filed.
+              </Text>
+              <TextInput
+                style={styles.refInput}
+                placeholder="Government tracking / complaint ID"
+                placeholderTextColor={colors.muted}
+                value={officialReference ?? ""}
+                onChangeText={setOfficialReference}
+                autoCapitalize="characters"
+              />
+              <TextInput
+                style={styles.refInput}
+                placeholder="Tracking / status website (not the file-new page)"
+                placeholderTextColor={colors.muted}
+                value={websiteDraft}
+                onChangeText={setWebsiteDraft}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
               <Pressable
-                style={styles.filedBtn}
-                onPress={() => setOpenedChannel(true)}
+                style={styles.continue}
+                disabled={saving}
+                onPress={() => void saveFiling()}
               >
-                <Text style={styles.filedBtnText}>
-                  I’ve already used the official channel
-                </Text>
-              </Pressable>
-            ) : null}
-
-            {done ? (
-              <View style={styles.card}>
-                <Text style={styles.label}>Track on official channel</Text>
-                {trackingUrl ? (
-                  <>
-                    <Text style={styles.desc}>
-                      Open official tracking and enter your reference manually.
-                    </Text>
-                    <Pressable
-                      style={styles.secondaryBtn}
-                      onPress={openTracking}
-                    >
-                      <ExternalLink size={16} color={colors.primaryBlue} />
-                      <Text style={styles.secondaryBtnText}>
-                        Open Official Tracking
-                      </Text>
-                    </Pressable>
-                  </>
-                ) : phone ? (
-                  <Text style={styles.desc}>
-                    No verified web tracking URL. Call {phone} with your
-                    official reference to check status.
-                  </Text>
+                {saving ? (
+                  <ActivityIndicator color={colors.white} />
                 ) : (
-                  <Text style={styles.desc}>
-                    Tracking URL not verified - use the authority’s official
-                    channel. Status in My Cases is recorded by you only.
-                  </Text>
+                  <Text style={styles.continueText}>Save to My Cases</Text>
                 )}
-                <Pressable style={styles.doneLink} onPress={finish}>
-                  <Text style={styles.doneLinkText}>Go to My Cases</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {!isFire && !done ? (
-              <View style={styles.card}>
-                <Text style={styles.label}>What you have ready</Text>
-                {[
-                  {
-                    key: "issue",
-                    label: "Issue identified",
-                    ready: Boolean(categoryId && issueTypeSlug),
-                  },
-                  {
-                    key: "photos",
-                    label: "Photos / videos",
-                    ready: evidence.length > 0,
-                  },
-                  {
-                    key: "location",
-                    label: "Location",
-                    ready: Boolean(incidentSummary),
-                  },
-                  {
-                    key: "description",
-                    label: "Prepared description",
-                    ready: Boolean(
-                      preparedDescription.trim() || builtDescription
-                    ),
-                  },
-                ].map((c) => (
-                  <View key={c.key} style={styles.checkRow}>
-                    <View
-                      style={[
-                        styles.checkDot,
-                        c.ready ? styles.checkDotOn : styles.checkDotOff,
-                      ]}
-                    >
-                      {c.ready ? (
-                        <Check size={12} color={colors.white} strokeWidth={3} />
-                      ) : null}
-                    </View>
-                    <Text
-                      style={[
-                        styles.checkText,
-                        !c.ready && styles.checkTextMuted,
-                      ]}
-                    >
-                      {c.label}
-                      {c.ready ? "" : " - not added yet"}
+              </Pressable>
+              {done ? (
+                <>
+                  <Pressable
+                    style={styles.alertPublicBtn}
+                    onPress={() =>
+                      navigation.navigate("PostPublicAlert", {
+                        fromReport: true,
+                        presetDescription: [
+                          category?.title,
+                          issueLabel,
+                        ]
+                          .filter(Boolean)
+                          .join(": "),
+                      })
+                    }
+                  >
+                    <Megaphone size={18} color={colors.primaryBlue} />
+                    <Text style={styles.alertPublicBtnText}>
+                      Also alert public nearby
                     </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
+                  </Pressable>
+                  <Pressable style={styles.doneLink} onPress={finish}>
+                    <Text style={styles.doneLinkText}>Open My Cases</Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
           </>
         )}
       </ScrollView>
@@ -2681,7 +2348,24 @@ const styles = StyleSheet.create({
   doneLink: { paddingVertical: 14, alignItems: "center" },
   doneLinkText: {
     color: colors.linkBlue,
+    fontWeight: "700",
     fontSize: 15,
+  },
+  alertPublicBtn: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.primaryBlue,
+    backgroundColor: colors.lightBlue,
+  },
+  alertPublicBtnText: {
+    color: colors.primaryBlue,
     fontWeight: "800",
+    fontSize: 15,
   },
 });

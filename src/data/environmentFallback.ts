@@ -10,6 +10,7 @@ import {
   ENVIRONMENT_GROUPS,
   ENVIRONMENT_RIGHTS_SOURCE,
 } from "./environmentKnowledge";
+import { MCD311_CREATE, MCD311_TRACK } from "./mcd311Urls";
 
 const NGMS = ENVIRONMENT_RIGHTS_SOURCE.ngms;
 const NGMS_TRACK = ENVIRONMENT_RIGHTS_SOURCE.ngmsTrack;
@@ -322,9 +323,10 @@ export const FALLBACK_ENVIRONMENT_ROUTING: RoutedAuthority[] = [
       }),
       ch({
         channel_type: "website",
-        label: "MCD Online feedback",
-        value: "https://mcdonline.nic.in/portal/feedback",
-        action_url: "https://mcdonline.nic.in/portal/feedback",
+        label: "MCD311 file / track",
+        value: "https://mcdonline.nic.in/",
+        action_url: MCD311_CREATE,
+        tracking_url: MCD311_TRACK,
         purpose: "web_portal",
       }),
     ],
@@ -470,8 +472,8 @@ export const FALLBACK_ENVIRONMENT_SERVICES: Record<
         "155305 / MCD feedback — only where municipal land/asset may apply. Not auto for pollution.",
       service_type: "complaint",
       official_url: "https://mcdonline.nic.in/portal/feedback",
-      filing_url: "https://mcdonline.nic.in/portal/feedback",
-      tracking_url: null,
+      filing_url: MCD311_CREATE,
+      tracking_url: MCD311_TRACK,
       phone: "155305",
       integration_type: "phone",
       authority_slug: "mcd",

@@ -161,7 +161,9 @@ export function ReportDraftProvider({
   children: React.ReactNode;
 }) {
   const [draftKey, setDraftKey] = useState(newDraftKey);
-  const [categoryId, setCategoryId] = useState<ReportCategoryId | null>(null);
+  const [categoryId, setCategoryIdState] = useState<ReportCategoryId | null>(
+    null
+  );
   const [issueTypeSlug, setIssueTypeSlug] = useState<string | null>(null);
   const [emergencyChoice, setEmergencyChoice] =
     useState<EmergencyChoice>(null);
@@ -198,6 +200,26 @@ export function ReportDraftProvider({
   );
   const [officialFiledOn, setOfficialFiledOn] = useState<string | null>(null);
   const [preparedDescription, setPreparedDescription] = useState("");
+
+  /** Changing category must drop the previous issue/office/hints or labels mix. */
+  const setCategoryId = (id: ReportCategoryId | null) => {
+    setCategoryIdState((prev) => {
+      if (prev === id) return prev;
+      setIssueTypeSlug(null);
+      setEmergencyChoice(null);
+      setEmergencyResult(null);
+      setSelectedAuthority(null);
+      setPropertyContext(null);
+      setElectricityProviderHint(null);
+      setWaterJurisdictionHint(null);
+      setWasteJurisdictionHint(null);
+      setRoadsJurisdictionHint(null);
+      setRoadsAssetHint(null);
+      setEnvironmentJurisdictionHint(null);
+      setPreparedDescription("");
+      return id;
+    });
+  };
 
   const value = useMemo(
     () => ({
@@ -315,6 +337,21 @@ export function useReportDraft() {
   return ctx;
 }
 
+function isPlausibleIndiaPlace(text: string): boolean {
+  const t = text.toLowerCase();
+  if (
+    t.includes("san francisco") ||
+    t.includes("california") ||
+    t.includes("united states") ||
+    t.includes(", ca,") ||
+    t.includes(", ca ") ||
+    t.endsWith(", ca")
+  ) {
+    return false;
+  }
+  return true;
+}
+
 /** Human-readable incident location line (optional fields). */
 export function formatIncidentLocationSummary(
   loc: ReportLocationDraft
@@ -329,9 +366,17 @@ export function formatIncidentLocationSummary(
     loc.state,
     loc.postal,
     loc.country,
-  ].filter((p) => Boolean(p && String(p).trim()));
+  ].filter((p) => Boolean(p && String(p).trim() && isPlausibleIndiaPlace(String(p))));
   if (parts.length) return parts.join(", ");
-  if (loc.latitude != null && loc.longitude != null) {
+  // Don't show raw coords from outside India (simulator defaults).
+  if (
+    loc.latitude != null &&
+    loc.longitude != null &&
+    loc.latitude >= 6.5 &&
+    loc.latitude <= 37.5 &&
+    loc.longitude >= 68 &&
+    loc.longitude <= 97.5
+  ) {
     return `${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}`;
   }
   return null;

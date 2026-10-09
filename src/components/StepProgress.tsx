@@ -10,7 +10,7 @@ type Props = {
   label?: string;
 };
 
-/** 6-stage progress for Report a Concern. */
+/** Progress for Report a Concern (4 stages by default). */
 export default function StepProgress({
   current,
   total = 6,

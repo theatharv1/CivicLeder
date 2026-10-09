@@ -1,7 +1,6 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
-  FileCheck2,
   Home,
   Search,
   MessageSquareText,
@@ -9,7 +8,7 @@ import {
 } from "lucide-react-native";
 import { colors } from "../theme/tokens";
 
-export type TabKey = "home" | "report" | "explore" | "cases" | "profile";
+export type TabKey = "home" | "report" | "explore" | "profile";
 
 type Props = {
   active: TabKey;
@@ -28,7 +27,6 @@ const TABS: {
   { key: "home", label: "Home", Icon: Home },
   { key: "report", label: "Report", Icon: MessageSquareText },
   { key: "explore", label: "Explore", Icon: Search },
-  { key: "cases", label: "My Cases", Icon: FileCheck2 },
   { key: "profile", label: "Profile", Icon: UserRound },
 ];
 

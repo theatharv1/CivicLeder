@@ -19,20 +19,26 @@ type Props = NativeStackScreenProps<RootStackParamList, "EditProfile">;
 
 export default function EditProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { profile, loggedIn, setDisplayName } = useProfile();
-  const [displayName, setName] = useState(profile?.displayName ?? "");
+  const { profile, loggedIn, updateProfile } = useProfile();
+  const [username, setUsername] = useState(profile?.username ?? "");
+  const [phone, setPhone] = useState(profile?.phone ?? "");
+  const [address, setAddress] = useState(profile?.address ?? "");
 
   if (!loggedIn || !profile) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top + 8, paddingHorizontal: space.screen }]}>
+      <View
+        style={[
+          styles.root,
+          {
+            paddingTop: insets.top + 8,
+            paddingHorizontal: space.screen,
+          },
+        ]}
+      >
         <Pressable onPress={() => navigation.goBack()} style={styles.back}>
           <ArrowLeft size={22} color={colors.navy} />
         </Pressable>
-        <Text style={styles.title}>No profile yet</Text>
-        <Text style={styles.hint}>
-          You are browsing as a guest. Create a username and password if you want
-          a profile on this phone.
-        </Text>
+        <Text style={styles.title}>No profile</Text>
         <Pressable
           style={styles.save}
           onPress={() => navigation.replace("Auth", { mode: "create" })}
@@ -57,28 +63,54 @@ export default function EditProfileScreen({ navigation }: Props) {
           <ArrowLeft size={22} color={colors.navy} />
         </Pressable>
         <Text style={styles.title}>Edit profile</Text>
-        <Text style={styles.hint}>
-          This stays on your phone. Public posts never show your username.
-        </Text>
 
         <Text style={styles.label}>Username</Text>
-        <Text style={styles.readonly}>@{profile.username}</Text>
-
-        <Text style={styles.label}>Display name</Text>
         <TextInput
           style={styles.input}
-          value={displayName}
-          onChangeText={setName}
-          placeholder="Only visible to you"
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="username"
           placeholderTextColor={colors.muted}
+        />
+        <Text style={styles.hint}>
+          For this phone only. Public alerts never show it.
+        </Text>
+
+        <Text style={styles.label}>Mobile</Text>
+        <TextInput
+          style={styles.input}
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+          placeholder="10-digit mobile"
+          placeholderTextColor={colors.muted}
+        />
+
+        <Text style={styles.label}>Address</Text>
+        <TextInput
+          style={[styles.input, styles.area]}
+          value={address}
+          onChangeText={setAddress}
+          placeholder="Area / locality"
+          placeholderTextColor={colors.muted}
+          multiline
         />
 
         <Pressable
           style={styles.save}
           onPress={() => {
             void (async () => {
-              await setDisplayName(displayName);
-              Alert.alert("Saved", "Profile updated on this phone.");
+              const result = await updateProfile({
+                username,
+                phone,
+                address,
+              });
+              if (!result.ok) {
+                Alert.alert("Could not save", result.error);
+                return;
+              }
               navigation.goBack();
             })();
           }}
@@ -107,23 +139,18 @@ const styles = StyleSheet.create({
     color: colors.navy,
     marginBottom: 8,
   },
-  hint: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.mutedDark,
-    marginBottom: 8,
-  },
   label: {
     marginTop: 12,
     fontSize: 13,
     fontWeight: "700",
     color: colors.mutedDark,
   },
-  readonly: {
+  hint: {
     marginTop: 6,
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.navy,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.mutedDark,
+    fontWeight: "500",
   },
   input: {
     marginTop: 6,
@@ -134,6 +161,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: colors.navy,
+  },
+  area: {
+    minHeight: 72,
+    textAlignVertical: "top",
   },
   save: {
     marginTop: 28,
