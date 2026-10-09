@@ -9,6 +9,7 @@ export const LOCAL_USER_DATA_KEYS = [
   "mydelhi.community_votes.v1",
   "mydelhi.community_my_tips.v1",
   "mydelhi.device_id.v1",
+  "civicleder.device_id.v1",
   "civicleader.auth.accounts.v1",
   "civicleader.auth.session.v1",
 ] as const;

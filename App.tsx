@@ -109,32 +109,53 @@ function AppGate() {
 
   useEffect(() => {
     if (!profileReady) return;
+    let alive = true;
     void (async () => {
-      const [ob, entry] = await Promise.all([
-        hasCompletedOnboarding(),
-        hasEntryChoice(),
-      ]);
-      if (!ob) {
-        setGate("onboarding");
-        return;
+      try {
+        const [ob, entry] = await Promise.all([
+          hasCompletedOnboarding(),
+          hasEntryChoice(),
+        ]);
+        if (!alive) return;
+        if (!ob) {
+          setGate("onboarding");
+          return;
+        }
+        if (!entry && !loggedIn) {
+          setGate("welcome");
+          return;
+        }
+        setGate("app");
+      } catch {
+        if (alive) setGate("onboarding");
       }
-      if (!entry && !loggedIn) {
-        setGate("welcome");
-        return;
-      }
-      setGate("app");
     })();
+    return () => {
+      alive = false;
+    };
   }, [profileReady, loggedIn]);
 
   // SafeWalk was removed: stop any background tracking left by an older build.
   useEffect(() => {
-    void cleanupLegacySafeWalk();
+    const t = setTimeout(() => {
+      void cleanupLegacySafeWalk();
+    }, 1500);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
     if (gate === "loading") return;
     void SplashScreen.hideAsync().catch(() => undefined);
   }, [gate]);
+
+  // Hard escape: never leave users on the native splash forever.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void SplashScreen.hideAsync().catch(() => undefined);
+      setGate((g) => (g === "loading" ? "onboarding" : g));
+    }, 3500);
+    return () => clearTimeout(t);
+  }, []);
 
   if (gate === "loading") {
     return (

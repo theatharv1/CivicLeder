@@ -143,10 +143,11 @@ export async function listPublicAlerts(near?: {
   latitude: number;
   longitude: number;
 } | null): Promise<Result<PublicAlert[]>> {
-  const q = near
+  // Empty path → GET /public-alerts (Express treats trailing "/" the same).
+  const path = near
     ? `?lat=${near.latitude.toFixed(5)}&lng=${near.longitude.toFixed(5)}`
     : "";
-  const r = await call<ApiAlert[]>(`/${q}`);
+  const r = await call<ApiAlert[]>(path);
   return r.ok ? { ok: true, data: r.data.map(fromApi) } : r;
 }
 

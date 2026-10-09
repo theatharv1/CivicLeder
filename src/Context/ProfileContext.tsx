@@ -66,7 +66,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const boot = (async () => {
       try {
         const session = await getSession();
         if (!alive) return;
@@ -82,12 +82,22 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         } else {
           setProfile(null);
         }
+      } catch {
+        if (alive) setProfile(null);
       } finally {
         if (alive) setReady(true);
       }
     })();
+
+    // Fail open so splash never sticks if storage hangs.
+    const failOpen = setTimeout(() => {
+      if (alive) setReady(true);
+    }, 2500);
+
+    void boot.finally(() => clearTimeout(failOpen));
     return () => {
       alive = false;
+      clearTimeout(failOpen);
     };
   }, []);
 

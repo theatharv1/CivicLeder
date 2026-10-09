@@ -1,6 +1,8 @@
 import { storageGetItem, storageSetItem } from "./safeStorage";
 
-const DEVICE_ID_KEY = "mydelhi.device_id.v1";
+const DEVICE_ID_KEY = "civicleder.device_id.v1";
+/** Older builds used this key — migrate so votes/alerts stay stable. */
+const LEGACY_DEVICE_ID_KEY = "mydelhi.device_id.v1";
 
 function randomUuid(): string {
   // RFC4122-ish UUID without external crypto dependency
@@ -39,12 +41,22 @@ function fnv1aHex(input: string): string {
 export async function getDeviceId(): Promise<string> {
   const existing = await storageGetItem(DEVICE_ID_KEY);
   if (existing && existing.length >= 16) return existing;
+
+  const legacy = await storageGetItem(LEGACY_DEVICE_ID_KEY);
+  if (legacy && legacy.length >= 16) {
+    await storageSetItem(DEVICE_ID_KEY, legacy);
+    return legacy;
+  }
+
   const id = randomUuid();
   await storageSetItem(DEVICE_ID_KEY, id);
   return id;
 }
 
-/** Hash before sending — never store raw device UUID when avoidable. */
+/**
+ * Hash before sending — never store raw device UUID when avoidable.
+ * Salt stays `mydelhi:` so votes / isMine still match alerts posted by older builds.
+ */
 export async function getDeviceHash(): Promise<string> {
   const id = await getDeviceId();
   return fnv1aHex(`mydelhi:${id}`);

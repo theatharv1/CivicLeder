@@ -21,7 +21,11 @@ expo-env.d.ts
 !android/app/debug.keystore
 credentials.json
 android/keystore.properties
-android/app/ecoaadat-release.keystore
+android/app/*-release.keystore
+
+# Local release artifacts (never commit binaries)
+*.apk
+*.aab
 
 # Metro
 .metro-health-check*

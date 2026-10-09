@@ -1,15 +1,34 @@
 /**
  * Central HTTP client for CivicLeder backend (replaces direct Supabase access).
- * Set EXPO_PUBLIC_API_URL e.g. http://localhost:3000/api/v1
- * On a physical device use your LAN IP, not localhost.
+ * Set EXPO_PUBLIC_API_URL for local/dev (e.g. http://192.168.x.x:3000/api/v1).
+ * Release builds must still reach production if Metro did not inline .env.
  */
 
 type ExpoPublicEnv = {
   EXPO_PUBLIC_API_URL?: string;
 };
 
+/** Production API — used when env is missing (common in local Gradle release APKs). */
+export const DEFAULT_API_URL = "https://api.civicleder.in/api/v1";
+
 const env = (globalThis as { process?: { env?: ExpoPublicEnv } }).process?.env;
-const baseUrl = (env?.EXPO_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+const fromEnv = (env?.EXPO_PUBLIC_API_URL ?? "").trim().replace(/\/$/, "");
+
+/** Optional: app.config.js extra.apiUrl (EAS / Expo Constants). */
+function fromExpoExtra(): string {
+  try {
+    // Lazy require so tests / metro don't fail if expo-constants isn't ready.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Constants = require("expo-constants").default as {
+      expoConfig?: { extra?: { apiUrl?: string } };
+    };
+    return (Constants.expoConfig?.extra?.apiUrl ?? "").trim().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+const baseUrl = fromEnv || fromExpoExtra() || DEFAULT_API_URL;
 
 export const apiConfigured = Boolean(baseUrl);
 export const apiBaseUrl = baseUrl;

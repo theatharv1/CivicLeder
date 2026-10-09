@@ -81,12 +81,27 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void refreshGps();
+    // Defer GPS so the splash / first screen can paint before the
+    // location-permission prompt (which can feel like a hang on open).
+    let cancelled = false;
+    const start = setTimeout(() => {
+      if (cancelled) return;
+      void refreshGps();
+    }, 1200);
+    // Fail open: never leave screens waiting on locationReady forever.
+    const failOpen = setTimeout(() => {
+      if (!cancelled) setLocationReady(true);
+    }, 14_000);
     const timer = setInterval(() => {
       void refreshGps();
     }, 90_000);
-    return () => clearInterval(timer);
-  }, []);
+    return () => {
+      cancelled = true;
+      clearTimeout(start);
+      clearTimeout(failOpen);
+      clearInterval(timer);
+    };
+  }, [refreshGps]);
 
   const locationLabel = useMemo(() => {
     if (gps?.addressText) {
